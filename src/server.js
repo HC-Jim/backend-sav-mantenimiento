@@ -5,6 +5,7 @@ const { env, validar } = require('./config/env');
 const authRoutes = require('./routes/auth.routes');
 const mantenimientoRoutes = require('./routes/mantenimiento.routes');
 const reservaRoutes = require('./routes/reserva.routes');
+const gestionRoutes = require('./routes/gestion.routes');
 const { errorHandler, notFound } = require('./middlewares/error.middleware');
 
 // Falla temprano si falta configuracion critica.
@@ -28,6 +29,7 @@ app.get('/', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/mantenimiento', mantenimientoRoutes);
 app.use('/api/alquiler', reservaRoutes);
+app.use('/api/gestion', gestionRoutes);
 
 // 404 y manejador de errores (siempre al final)
 app.use(notFound);

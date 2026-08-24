@@ -39,6 +39,24 @@ class VehiculoRepository {
     );
     return Vehiculo.fromRow(data);
   }
+
+  // ---------- CRUD (Mantener Vehiculo) ----------
+  async crear(datos) {
+    const data = unwrap(await supabase.from('vehiculo').insert(datos).select().single());
+    return Vehiculo.fromRow(data);
+  }
+
+  async actualizar(id, cambios) {
+    const data = unwrap(
+      await supabase.from('vehiculo').update(cambios).eq('id', id).select().single()
+    );
+    return Vehiculo.fromRow(data);
+  }
+
+  async eliminar(id) {
+    unwrap(await supabase.from('vehiculo').delete().eq('id', id));
+    return { eliminado: true };
+  }
 }
 
 module.exports = new VehiculoRepository();
