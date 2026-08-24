@@ -21,10 +21,16 @@ class CatalogoPrecioRepository {
   }
 
   async buscarPorCategoria(categoria) {
+    // Tolerante a categorias duplicadas: toma la primera coincidencia.
     const data = unwrap(
-      await supabase.from('catalogo_precio').select('*').eq('categoria', categoria).maybeSingle()
+      await supabase
+        .from('catalogo_precio')
+        .select('*')
+        .eq('categoria', categoria)
+        .order('id', { ascending: true })
+        .limit(1)
     );
-    return CatalogoPrecio.fromRow(data);
+    return data.length ? CatalogoPrecio.fromRow(data[0]) : null;
   }
 
   async crear(datos) {
