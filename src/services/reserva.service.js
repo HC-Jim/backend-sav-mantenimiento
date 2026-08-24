@@ -129,6 +129,8 @@ class ReservaService {
     const pagoDevolucion = await reservaRepo.crearPago({
       reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: metodo || 'TARJETA', estado: 'PAGADO'
     });
+    // <<include>> Emitir Comprobante (de la devolucion de garantia)
+    await comprobante.emitir({ pago_id: pagoDevolucion.id, monto_total: devolucion });
 
     const actualizada = await reservaRepo.actualizar(reserva.id, {
       estado: EstadoReserva.FINALIZADA,
@@ -151,9 +153,11 @@ class ReservaService {
     const devolucion = Math.max(reserva.garantiaMonto - penalidad, 0);
 
     if (devolucion > 0) {
-      await reservaRepo.crearPago({
+      const pagoDev = await reservaRepo.crearPago({
         reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: 'TARJETA', estado: 'PAGADO'
       });
+      // <<include>> Emitir Comprobante (de la cancelacion / devolucion)
+      await comprobante.emitir({ pago_id: pagoDev.id, monto_total: devolucion });
     }
 
     const actualizada = await reservaRepo.actualizar(reserva.id, {
