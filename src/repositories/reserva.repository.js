@@ -31,7 +31,7 @@ class ReservaRepository {
     const data = unwrap(
       await supabase
         .from('reserva')
-        .select('*, vehiculo:vehiculo_id (placa, marca, modelo)')
+        .select('*, vehiculo:vehiculo_id (id, placa, marca, modelo)')
         .eq('cliente_id', clienteId)
         .order('fecha_solicitud', { ascending: false })
     );
@@ -42,7 +42,7 @@ class ReservaRepository {
     const data = unwrap(
       await supabase
         .from('reserva')
-        .select('*, vehiculo:vehiculo_id (placa, marca, modelo), cliente:cliente_id (razon_social)')
+        .select('*, vehiculo:vehiculo_id (id, placa, marca, modelo), cliente:cliente_id (razon_social)')
         .order('fecha_solicitud', { ascending: false })
     );
     return data.map(Reserva.fromRow);

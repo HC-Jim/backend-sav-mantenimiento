@@ -50,7 +50,7 @@ class OrdenRepository {
   async listar(estado) {
     let q = supabase
       .from('orden_mantenimiento')
-      .select('*, vehiculo:vehiculo_id (placa, marca, modelo)')
+      .select('*, vehiculo:vehiculo_id (id, placa, marca, modelo)')
       .order('fecha_creacion', { ascending: false });
     if (estado) q = q.eq('estado', estado);
     const data = unwrap(await q);
