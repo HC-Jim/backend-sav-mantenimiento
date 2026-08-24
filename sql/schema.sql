@@ -16,11 +16,23 @@
 -- ============================================================
 
 -- ---------- Reinstalacion limpia (borra todo y recrea) ----------
-drop table if exists
-  acta_entrega, informe_tecnico, detalle_presupuesto, presupuesto,
-  repuesto_item, requerimiento_repuesto, inspeccion, orden_mantenimiento,
-  comprobante, pago, alquiler, reserva, seguro, repuesto, vehiculo,
-  cliente, usuario cascade;
+drop table if exists acta_entrega cascade;
+drop table if exists informe_tecnico cascade;
+drop table if exists detalle_presupuesto cascade;
+drop table if exists presupuesto cascade;
+drop table if exists repuesto_item cascade;
+drop table if exists requerimiento_repuesto cascade;
+drop table if exists inspeccion cascade;
+drop table if exists orden_mantenimiento cascade;
+drop table if exists comprobante cascade;
+drop table if exists pago cascade;
+drop table if exists alquiler cascade;
+drop table if exists reserva cascade;
+drop table if exists seguro cascade;
+drop table if exists repuesto cascade;
+drop table if exists vehiculo cascade;
+drop table if exists cliente cascade;
+drop table if exists usuario cascade;
 
 -- ============================================================
 --  MODULO SEGURIDAD
