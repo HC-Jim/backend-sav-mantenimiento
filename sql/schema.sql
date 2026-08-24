@@ -70,13 +70,14 @@ alter table usuario
 
 create table vehiculo (
   id                          bigint generated always as identity primary key,
+  sku                         varchar(30) unique,     -- codigo unico del vehiculo
   placa                       varchar(10) not null unique,
   marca                       varchar(50),
   modelo                      varchar(50),
   anio                        integer,
   color                       varchar(30),
+  categoria                   varchar(50),            -- define su precio (ver catalogo_precio)
   kilometraje                 integer default 0,      -- kilometraje actual
-  tarifa_diaria               numeric(10,2) default 0,
   fecha_ultimo_mantenimiento  date,
   fecha_proximo_mantenimiento date,
   estado                      varchar(20) default 'DISPONIBLE', -- DISPONIBLE | ALQUILADO | EN_MANTENIMIENTO
@@ -168,14 +169,21 @@ create table seguro (
   creado_en           timestamptz default now()
 );
 
--- Catalogo de precios (tarifa por categoria de vehiculo)
+-- Catalogo de precios por categoria de vehiculo.
+--   precio_regular: precio de lista (referencia, debe ser > precio_normal)
+--   precio_normal:  precio de venta habitual (por dia)
+--   precio_campania: precio por dia cuando el alquiler dura >= dias_min_campania
 create table catalogo_precio (
-  id          bigint generated always as identity primary key,
-  categoria   varchar(50) not null,
-  descripcion varchar(150),
-  precio_dia  numeric(10,2) not null default 0,
-  vigente     boolean default true,
-  creado_en   timestamptz default now()
+  id                bigint generated always as identity primary key,
+  categoria         varchar(50) not null unique,
+  descripcion       varchar(150),
+  precio_regular    numeric(10,2) not null default 0,
+  precio_normal     numeric(10,2) not null default 0,
+  precio_campania   numeric(10,2) not null default 0,
+  dias_min_campania integer not null default 7,
+  vigente           boolean default true,
+  creado_en         timestamptz default now(),
+  constraint chk_regular_mayor check (precio_regular >= precio_normal)
 );
 
 -- ============================================================
@@ -305,15 +313,15 @@ insert into usuario (nombre, email, password_hash, rol, cliente_id) values
   ('Carla Mendoza', 'carla@autorent.pe',    '$2a$10$SEX8ramyv3td9154X1qWkeiOZp9I7iuRFKPHJHpHCYh4ss.DVm0mG', 'CLIENTE',
      (select id from cliente where numero_documento = '45871236'));
 
-insert into vehiculo (placa, marca, modelo, anio, color, kilometraje, tarifa_diaria, fecha_ultimo_mantenimiento, fecha_proximo_mantenimiento) values
-  ('ABC-123', 'Toyota', 'Yaris', 2021, 'Blanco', 48000, 120.00, '2026-02-10', '2026-08-10'),
-  ('XYZ-789', 'Kia',    'Rio',   2022, 'Gris',   12000, 110.00, '2026-07-01', '2027-01-01');
+insert into vehiculo (sku, placa, marca, modelo, anio, color, categoria, kilometraje, fecha_ultimo_mantenimiento, fecha_proximo_mantenimiento) values
+  ('VH-0001', 'ABC-123', 'Toyota', 'Yaris', 2021, 'Blanco', 'Economico', 48000, '2026-02-10', '2026-08-10'),
+  ('VH-0002', 'XYZ-789', 'Kia',    'Rio',   2022, 'Gris',   'Sedan',     12000, '2026-07-01', '2027-01-01');
 
-insert into catalogo_precio (categoria, descripcion, precio_dia) values
-  ('Economico', 'Autos compactos de bajo consumo', 110.00),
-  ('Sedan',     'Autos medianos 4 puertas',        150.00),
-  ('SUV',       'Camionetas familiares',           220.00),
-  ('Premium',   'Vehiculos de alta gama',          350.00);
+insert into catalogo_precio (categoria, descripcion, precio_regular, precio_normal, precio_campania, dias_min_campania) values
+  ('Economico', 'Autos compactos de bajo consumo', 130.00, 110.00,  95.00, 7),
+  ('Sedan',     'Autos medianos 4 puertas',        180.00, 150.00, 130.00, 7),
+  ('SUV',       'Camionetas familiares',           260.00, 220.00, 190.00, 5),
+  ('Premium',   'Vehiculos de alta gama',          420.00, 350.00, 300.00, 5);
 
 insert into repuesto (nombre, referencia, costo_unitario, stock) values
   ('Pastillas de freno delanteras', 'BR-450', 120.00, 8),

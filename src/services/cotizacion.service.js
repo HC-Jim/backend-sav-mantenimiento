@@ -3,6 +3,7 @@ const reservaRepo = require('../repositories/reserva.repository');
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const busqueda = require('./busqueda.service');        // <<include>> Buscar Vehiculo / Buscar Cliente
 const comprobante = require('./comprobante.service');   // <<include>> Emitir Comprobante
+const precioService = require('./precio.service');      // precio por categoria (normal/campania)
 const PoliticasAlquiler = require('../domain/PoliticasAlquiler');
 const { EstadoCotizacion, MaquinaCotizacion } = require('../domain/EstadoCotizacion');
 const { EstadoReserva } = require('../domain/EstadoReserva');
@@ -31,7 +32,7 @@ class CotizacionService {
     if (solapan.length > 0) throw AppError.conflict('El vehiculo ya esta reservado en esas fechas');
 
     const dias = PoliticasAlquiler.diasEntre(fecha_inicio, fecha_fin);
-    const tarifa = vehiculo.tarifaDiaria || 0;
+    const { tarifa } = await precioService.tarifaPara(vehiculo.categoria, dias);
 
     return cotizacionRepo.crear({
       cliente_id,

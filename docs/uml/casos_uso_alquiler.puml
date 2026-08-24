@@ -1,0 +1,53 @@
+@startuml Casos de Uso - Proceso de Alquiler
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "Asesor de Ventas" as ASE
+actor "Cliente" as CLI
+actor "Cajero" as CAJ
+
+rectangle "Proceso de Alquiler" {
+  usecase "Consultar Catalogo" as CC
+  usecase "Consultar Disponibilidad" as CD
+  usecase "Generar Cotizacion" as GC
+  usecase "Aceptar/Rechazar Cotizacion" as ARC
+  usecase "Solicitar Garantia" as SG
+  usecase "Pagar Garantia" as PG
+  usecase "Generar Orden de Reserva" as GOR
+  usecase "Pagar Alquiler" as PA
+  usecase "Cancelar Reserva" as CR
+  usecase "Gestionar Cancelacion" as GCA
+  usecase "Devolver Garantia" as DG
+  usecase "Emitir Comprobante" as EC
+  usecase "CRUD Cliente" as CRUDC
+  usecase "Buscar Cliente" as BC
+  usecase "Buscar Vehiculo" as BV
+}
+
+ASE -- GC
+ASE -- SG
+ASE -- GOR
+ASE -- CRUDC
+CLI -- CC
+CLI -- CD
+CLI -- ARC
+CLI -- PG
+CLI -- PA
+CLI -- CR
+CAJ -- GCA
+CAJ -- DG
+CAJ -- EC
+
+GC ..> CC : <<include>>
+GC ..> CD : <<include>>
+CC ..> BV : <<include>>
+CD ..> BV : <<include>>
+GOR ..> PG : <<include>>
+CRUDC ..> BC : <<include>>
+SG ..> BC : <<include>>
+GCA ..> CR : <<extend>>
+GCA ..> DG : <<include>>
+PA ..> EC : <<include>>
+DG ..> EC : <<include>>
+@enduml

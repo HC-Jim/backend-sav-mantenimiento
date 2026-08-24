@@ -1,0 +1,122 @@
+@startuml Diagrama de Clases - Dominio
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+hide methods
+
+class Usuario {
+  +id
+  +nombre
+  +email
+  +rol
+  +estado
+}
+class Cliente {
+  +id
+  +tipoDocumento
+  +numeroDocumento
+  +razonSocial
+  +licenciaConducir
+}
+class Vehiculo {
+  +id
+  +placa
+  +marca
+  +modelo
+  +tarifaDiaria
+  +estado
+}
+class CatalogoPrecio {
+  +id
+  +categoria
+  +precioDia
+}
+class Seguro {
+  +id
+  +tipoSeguro
+  +numPoliza
+  +fechaVencimiento
+}
+class Cotizacion {
+  +id
+  +estado
+  +montoTotalEstimado
+  +garantiaMonto
+}
+class Reserva {
+  +id
+  +estado
+  +garantiaMonto
+  +penalidad
+  +montoDevuelto
+}
+class Alquiler {
+  +id
+  +estado
+  +kilometrajeSalida
+  +kilometrajeRetorno
+}
+class Pago {
+  +id
+  +concepto
+  +monto
+  +metodo
+}
+class Comprobante {
+  +id
+  +tipo
+  +montoTotal
+}
+class OrdenMantenimiento {
+  +id
+  +estado
+  +prioridad
+}
+class Inspeccion {
+  +id
+  +resultado
+  +necesitaRepuestos
+}
+class Presupuesto {
+  +id
+  +estado
+  +total
+}
+class DetallePresupuesto {
+  +id
+  +cantidad
+  +subtotal
+}
+class Repuesto {
+  +id
+  +nombre
+  +stock
+}
+class InformeTecnico {
+  +id
+  +conforme
+}
+class ActaEntrega {
+  +id
+  +contenido
+}
+
+Cliente "1" --> "*" Cotizacion
+Vehiculo "1" --> "*" Cotizacion
+Usuario "1" --> "*" Cotizacion : asesor
+Cotizacion "1" --> "0..1" Reserva
+Cliente "1" --> "*" Reserva
+Vehiculo "1" --> "*" Reserva
+Reserva "1" --> "*" Alquiler
+Reserva "1" --> "*" Pago
+Cotizacion "1" --> "*" Pago
+Pago "1" --> "1" Comprobante
+Vehiculo "1" --> "*" Seguro
+Vehiculo "1" --> "*" OrdenMantenimiento
+Usuario "1" --> "*" OrdenMantenimiento : jefe/mecanico
+OrdenMantenimiento "1" --> "*" Inspeccion
+OrdenMantenimiento "1" --> "*" Presupuesto
+Presupuesto "1" --> "*" DetallePresupuesto
+DetallePresupuesto "*" --> "1" Repuesto
+OrdenMantenimiento "1" --> "1" InformeTecnico
+OrdenMantenimiento "1" --> "0..1" ActaEntrega
+@enduml

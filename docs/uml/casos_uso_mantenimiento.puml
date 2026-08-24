@@ -1,0 +1,38 @@
+@startuml Casos de Uso - Mantenimiento y Administracion
+left to right direction
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+actor "Jefe de Logistica" as JEF
+actor "Mecanico" as MEC
+actor "Administrador" as ADM
+
+rectangle "Mantenimiento y Administracion" {
+  usecase "Revisar Flota" as RF
+  usecase "Gestionar Orden de Mantenimiento" as GOM
+  usecase "Autorizar/Rechazar Presupuesto" as AP
+  usecase "Cerrar Conformidad" as CCO
+  usecase "Inspeccionar y Registrar Hallazgos" as IRH
+  usecase "Ejecutar Mantenimiento" as EM
+  usecase "Generar Documentos de Costos" as GDC
+  usecase "Buscar Vehiculo" as BV
+  usecase "CRUD Vehiculos" as CV
+  usecase "Catalogo de Precios" as CP
+  usecase "Registrar Renovacion de Seguro" as RRS
+}
+
+JEF -- RF
+JEF -- GOM
+JEF -- AP
+JEF -- CCO
+MEC -- IRH
+MEC -- EM
+ADM -- CV
+ADM -- CP
+ADM -- RRS
+
+RF ..> BV : <<include>>
+GOM ..> IRH : <<include>>
+GOM ..> GDC : <<include>>
+AP ..> GDC : <<include>>
+@enduml

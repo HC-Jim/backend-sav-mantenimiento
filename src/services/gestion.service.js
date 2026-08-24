@@ -19,13 +19,14 @@ class GestionService {
   crearVehiculo(datos) {
     if (!datos.placa) throw AppError.badRequest('La placa es obligatoria');
     return vehiculoRepo.crear({
+      sku: datos.sku || null,
       placa: datos.placa,
       marca: datos.marca,
       modelo: datos.modelo,
       anio: datos.anio,
       color: datos.color,
+      categoria: datos.categoria || null,
       kilometraje: datos.kilometraje || 0,
-      tarifa_diaria: datos.tarifa_diaria || 0,
       fecha_ultimo_mantenimiento: datos.fecha_ultimo_mantenimiento || null,
       fecha_proximo_mantenimiento: datos.fecha_proximo_mantenimiento || null,
       estado: datos.estado || 'DISPONIBLE'
@@ -129,17 +130,44 @@ class GestionService {
 
   crearPrecio(datos) {
     if (!datos.categoria) throw AppError.badRequest('La categoria es obligatoria');
+    const p = this.#validarPrecios(datos);
     return precioRepo.crear({
       categoria: datos.categoria,
       descripcion: datos.descripcion,
-      precio_dia: datos.precio_dia || 0,
+      precio_regular: p.regular,
+      precio_normal: p.normal,
+      precio_campania: p.campania,
+      dias_min_campania: p.diasMin,
       vigente: datos.vigente !== false
     });
   }
 
   async actualizarPrecio(id, cambios) {
     await this.#existe(precioRepo, id, 'Precio');
+    // Si vienen precios, validarlos.
+    if (cambios.precio_regular != null || cambios.precio_normal != null) {
+      const p = this.#validarPrecios(cambios);
+      cambios = {
+        ...cambios,
+        precio_regular: p.regular,
+        precio_normal: p.normal,
+        precio_campania: p.campania,
+        dias_min_campania: p.diasMin
+      };
+    }
     return precioRepo.actualizar(id, cambios);
+  }
+
+  /** Valida y normaliza los precios: el regular debe ser mayor al normal. */
+  #validarPrecios(datos) {
+    const regular = Number(datos.precio_regular || 0);
+    const normal = Number(datos.precio_normal || 0);
+    const campania = Number(datos.precio_campania || 0);
+    const diasMin = Number(datos.dias_min_campania || 7);
+    if (regular <= normal) {
+      throw AppError.badRequest('El precio regular debe ser mayor al precio normal');
+    }
+    return { regular, normal, campania, diasMin };
   }
 
   async eliminarPrecio(id) {

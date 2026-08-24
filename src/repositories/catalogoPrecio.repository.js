@@ -20,6 +20,13 @@ class CatalogoPrecioRepository {
     return CatalogoPrecio.fromRow(data);
   }
 
+  async buscarPorCategoria(categoria) {
+    const data = unwrap(
+      await supabase.from('catalogo_precio').select('*').eq('categoria', categoria).maybeSingle()
+    );
+    return CatalogoPrecio.fromRow(data);
+  }
+
   async crear(datos) {
     const data = unwrap(await supabase.from('catalogo_precio').insert(datos).select().single());
     return CatalogoPrecio.fromRow(data);

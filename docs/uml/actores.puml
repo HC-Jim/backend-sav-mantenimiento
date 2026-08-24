@@ -1,0 +1,19 @@
+@startuml Diagrama de Actores
+skinparam shadowing false
+
+actor "Usuario" as U
+actor "Jefe de Logistica" as JEF
+actor "Mecanico" as MEC
+actor "Administrador" as ADM
+actor "Asesor de Ventas" as ASE
+actor "Cajero" as CAJ
+actor "Cliente" as CLI
+
+JEF --|> U
+MEC --|> U
+ADM --|> U
+ASE --|> U
+CAJ --|> U
+
+note right of CLI : Actor externo\n(no es un Usuario del sistema)
+@enduml

@@ -4,11 +4,13 @@
 class Vehiculo {
   constructor(row) {
     this.id = row.id;
+    this.sku = row.sku;
     this.placa = row.placa;
     this.marca = row.marca;
     this.modelo = row.modelo;
     this.anio = row.anio;
     this.color = row.color;
+    this.categoria = row.categoria;
     this.kilometraje = row.kilometraje;
     this.tarifaDiaria = row.tarifa_diaria != null ? Number(row.tarifa_diaria) : null;
     this.fechaUltimoMantenimiento = row.fecha_ultimo_mantenimiento;
@@ -28,11 +30,13 @@ class Vehiculo {
   toJSON() {
     return {
       id: this.id,
+      sku: this.sku,
       placa: this.placa,
       marca: this.marca,
       modelo: this.modelo,
       anio: this.anio,
       color: this.color,
+      categoria: this.categoria,
       kilometraje: this.kilometraje,
       tarifa_diaria: this.tarifaDiaria,
       fecha_ultimo_mantenimiento: this.fechaUltimoMantenimiento,
