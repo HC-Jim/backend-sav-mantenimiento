@@ -43,7 +43,7 @@ class AuthService {
 
   #firmarToken(usuario) {
     return jwt.sign(
-      { sub: usuario.id, rol: usuario.rol, nombre: usuario.nombre },
+      { sub: usuario.id, rol: usuario.rol, nombre: usuario.nombre, cliente_id: usuario.clienteId },
       env.jwtSecret,
       { expiresIn: env.jwtExpiresIn }
     );

@@ -22,7 +22,8 @@ const Estado = Object.freeze({
 
 const Rol = Object.freeze({
   JEFE_LOGISTICA: 'JEFE_LOGISTICA',
-  MECANICO: 'MECANICO'
+  MECANICO: 'MECANICO',
+  CLIENTE: 'CLIENTE'
 });
 
 // Estados finales: no admiten mas transiciones.

@@ -13,7 +13,7 @@ function autenticar(req, _res, next) {
       throw AppError.unauthorized('Falta el token de autenticacion (Bearer)');
     }
     const payload = authService.verificarToken(token);
-    req.user = { id: payload.sub, rol: payload.rol, nombre: payload.nombre };
+    req.user = { id: payload.sub, rol: payload.rol, nombre: payload.nombre, clienteId: payload.cliente_id || null };
     next();
   } catch (err) {
     next(err);

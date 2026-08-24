@@ -4,6 +4,7 @@ const cors = require('cors');
 const { env, validar } = require('./config/env');
 const authRoutes = require('./routes/auth.routes');
 const mantenimientoRoutes = require('./routes/mantenimiento.routes');
+const reservaRoutes = require('./routes/reserva.routes');
 const { errorHandler, notFound } = require('./middlewares/error.middleware');
 
 // Falla temprano si falta configuracion critica.
@@ -26,6 +27,7 @@ app.get('/', (_req, res) => {
 // Rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/mantenimiento', mantenimientoRoutes);
+app.use('/api/alquiler', reservaRoutes);
 
 // 404 y manejador de errores (siempre al final)
 app.use(notFound);

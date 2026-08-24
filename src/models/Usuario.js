@@ -4,12 +4,13 @@ const bcrypt = require('bcryptjs');
  * Actor del proceso: Jefe de Logistica o Mecanico.
  */
 class Usuario {
-  constructor({ id, nombre, email, password_hash, rol, estado, creado_en }) {
+  constructor({ id, nombre, email, password_hash, rol, cliente_id, estado, creado_en }) {
     this.id = id;
     this.nombre = nombre;
     this.email = email;
     this.passwordHash = password_hash;
     this.rol = rol;
+    this.clienteId = cliente_id || null;
     this.estado = estado;
     this.creadoEn = creado_en;
   }
@@ -39,6 +40,7 @@ class Usuario {
       nombre: this.nombre,
       email: this.email,
       rol: this.rol,
+      cliente_id: this.clienteId,
       estado: this.estado
     };
   }

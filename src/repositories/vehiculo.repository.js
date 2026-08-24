@@ -13,6 +13,14 @@ class VehiculoRepository {
     return Vehiculo.fromRow(data);
   }
 
+  /** Catalogo: todos los vehiculos (opcionalmente solo los disponibles). */
+  async listar({ soloDisponibles = false } = {}) {
+    let q = supabase.from('vehiculo').select('*').order('marca', { ascending: true });
+    if (soloDisponibles) q = q.eq('estado', 'DISPONIBLE');
+    const data = unwrap(await q);
+    return data.map(Vehiculo.fromRow);
+  }
+
   /** Vehiculos cuyo proximo mantenimiento ya vencio (o vence hoy). */
   async porMantener(hastaFecha) {
     const data = unwrap(

@@ -30,7 +30,8 @@ create table usuario (
   nombre        varchar(100) not null,
   email         varchar(120) not null unique,
   password_hash varchar(100) not null,
-  rol           varchar(20)  not null check (rol in ('JEFE_LOGISTICA', 'MECANICO')),
+  rol           varchar(20)  not null check (rol in ('JEFE_LOGISTICA', 'MECANICO', 'CLIENTE')),
+  cliente_id    bigint,        -- solo para rol CLIENTE (FK agregada tras crear la tabla cliente)
   estado        varchar(20)  not null default 'ACTIVO',
   creado_en     timestamptz  default now()
 );
@@ -48,6 +49,10 @@ create table cliente (
   correo           varchar(120),
   creado_en        timestamptz default now()
 );
+
+-- FK de usuario -> cliente (se agrega aqui porque cliente se crea despues de usuario)
+alter table usuario
+  add constraint fk_usuario_cliente foreign key (cliente_id) references cliente(id);
 
 create table vehiculo (
   id                          bigint generated always as identity primary key,
@@ -67,11 +72,18 @@ create table vehiculo (
 create table reserva (
   id                   bigint generated always as identity primary key,
   cliente_id           bigint not null references cliente(id),
+  vehiculo_id          bigint references vehiculo(id),
   fecha_solicitud      timestamptz default now(),
   fecha_inicio         date,
   fecha_fin            date,
-  estado               varchar(20) default 'PENDIENTE', -- PENDIENTE | CONFIRMADA | CANCELADA | FINALIZADA
+  -- PENDIENTE_PAGO_GARANTIA | CONFIRMADA | EN_CURSO | FINALIZADA | CANCELADA
+  estado               varchar(30) default 'PENDIENTE_PAGO_GARANTIA',
   monto_total_estimado numeric(10,2) default 0,
+  garantia_monto       numeric(10,2) default 0,
+  penalidad            numeric(10,2) default 0,
+  monto_devuelto       numeric(10,2) default 0,
+  motivo_cancelacion   text,
+  fecha_cancelacion    timestamptz,
   creado_en            timestamptz default now()
 );
 
@@ -94,8 +106,9 @@ create table pago (
   reserva_id  bigint references reserva(id),
   monto       numeric(10,2) not null default 0,
   fecha       timestamptz default now(),
-  tipo        varchar(30),      -- EFECTIVO | TARJETA | TRANSFERENCIA
-  estado      varchar(20) default 'PAGADO',
+  concepto    varchar(20) default 'ALQUILER', -- GARANTIA | ALQUILER | DEVOLUCION
+  metodo      varchar(20),      -- TARJETA | BILLETERA | EFECTIVO | TRANSFERENCIA
+  estado      varchar(20) default 'PAGADO',   -- PAGADO | RECHAZADO
   creado_en   timestamptz default now()
 );
 
@@ -233,13 +246,17 @@ create table acta_entrega (
 -- ============================================================
 --  DATOS DE EJEMPLO
 -- ============================================================
-insert into usuario (nombre, email, password_hash, rol) values
-  ('Ana Ruiz',  'jefe@autorent.pe',     '$2a$10$.x/GETs7R/aQ92XcLguIJeHpTDNy9lkdT1ii9IFGvy.NpyjaQLfjK', 'JEFE_LOGISTICA'),
-  ('Luis Paz',  'mecanico@autorent.pe', '$2a$10$VHH77PME/T1.sJU7w9x.HORRwC.x.StF7GLvbEaym4hvrMAl81xTO', 'MECANICO');
-
+-- Clientes (primero, para poder enlazar el usuario CLIENTE)
 insert into cliente (tipo_documento, numero_documento, razon_social, licencia_conducir, telefono, correo) values
-  ('DNI', '45871236', 'Carla Mendoza',       'Q45871236', '987654321', 'carla@example.com'),
+  ('DNI', '45871236', 'Carla Mendoza',       'Q45871236', '987654321', 'carla@autorent.pe'),
   ('RUC', '20512345671', 'Transportes SAC',  '-',         '01-4567890', 'ventas@transportes.pe');
+
+-- Usuarios (contrasenas: jefe123 / mecanico123 / cliente123)
+insert into usuario (nombre, email, password_hash, rol, cliente_id) values
+  ('Ana Ruiz',      'jefe@autorent.pe',     '$2a$10$.x/GETs7R/aQ92XcLguIJeHpTDNy9lkdT1ii9IFGvy.NpyjaQLfjK', 'JEFE_LOGISTICA', null),
+  ('Luis Paz',      'mecanico@autorent.pe', '$2a$10$VHH77PME/T1.sJU7w9x.HORRwC.x.StF7GLvbEaym4hvrMAl81xTO', 'MECANICO', null),
+  ('Carla Mendoza', 'carla@autorent.pe',    '$2a$10$SEX8ramyv3td9154X1qWkeiOZp9I7iuRFKPHJHpHCYh4ss.DVm0mG', 'CLIENTE',
+     (select id from cliente where numero_documento = '45871236'));
 
 insert into vehiculo (placa, marca, modelo, anio, color, kilometraje, tarifa_diaria, fecha_ultimo_mantenimiento, fecha_proximo_mantenimiento) values
   ('ABC-123', 'Toyota', 'Yaris', 2021, 'Blanco', 48000, 120.00, '2026-02-10', '2026-08-10'),
