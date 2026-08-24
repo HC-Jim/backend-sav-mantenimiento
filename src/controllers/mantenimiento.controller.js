@@ -1,102 +1,87 @@
 const svc = require('../services/mantenimiento.service');
+const asyncHandler = require('../utils/asyncHandler');
+const AppError = require('../utils/AppError');
 
-// Pequeno helper para no repetir try/catch en cada metodo.
-const handler = (fn) => async (req, res, next) => {
-  try {
-    await fn(req, res);
-  } catch (err) {
-    next(err);
-  }
-};
+/**
+ * Controlador del proceso de Gestion de Ordenes de Mantenimiento.
+ * Es fino: valida la entrada minima y delega la logica al servicio.
+ */
+class MantenimientoController {
+  // ----- Consultas -----
+  listarVehiculosPorMantener = asyncHandler(async (_req, res) => {
+    res.json(await svc.vehiculosPorMantener());
+  });
 
-// ===== JEFE DE LOGISTICA =====
+  listarCatalogo = asyncHandler(async (_req, res) => {
+    res.json(await svc.catalogoRepuestos());
+  });
 
-// 1. Revisar las fechas de los mantenimientos
-const listarVehiculosPorMantener = handler(async (req, res) => {
-  res.json(await svc.vehiculosQueRequierenMantenimiento());
-});
+  listarMecanicos = asyncHandler(async (_req, res) => {
+    res.json(await svc.listarMecanicos());
+  });
 
-// 2. Crear la orden de mantenimiento
-const crearOrden = handler(async (req, res) => {
-  const { vehiculo_id, jefe_logistica, tipo_servicio } = req.body;
-  if (!vehiculo_id || !jefe_logistica || !tipo_servicio) {
-    return res.status(400).json({ error: 'vehiculo_id, jefe_logistica y tipo_servicio son obligatorios' });
-  }
-  res.status(201).json(await svc.crearOrden(req.body));
-});
+  listarOrdenes = asyncHandler(async (req, res) => {
+    res.json(await svc.listarOrdenes(req.query.estado));
+  });
 
-// Gestiona y compra (marca los repuestos como comprados)
-const comprarRepuestos = handler(async (req, res) => {
-  res.json(await svc.marcarRepuestosComprados(req.params.requerimientoId));
-});
+  verOrden = asyncHandler(async (req, res) => {
+    res.json(await svc.obtenerOrden(req.params.ordenId));
+  });
 
-// Revisa y autoriza / rechaza presupuesto (gateway "Presupuesto autorizado?")
-const decidirPresupuesto = handler(async (req, res) => {
-  const { autorizado, motivo } = req.body;
-  if (typeof autorizado !== 'boolean') {
-    return res.status(400).json({ error: 'Debe enviar "autorizado": true|false' });
-  }
-  res.json(await svc.decidirPresupuesto(req.params.presupuestoId, autorizado, motivo));
-});
+  // ----- Jefe de Logistica -----
+  crearOrden = asyncHandler(async (req, res) => {
+    const { vehiculo_id, tipo_servicio } = req.body;
+    if (!vehiculo_id || !tipo_servicio) {
+      throw AppError.badRequest('vehiculo_id y tipo_servicio son obligatorios');
+    }
+    res.status(201).json(await svc.crearOrden(req.user, req.body));
+  });
 
-// Revisar informe + dar conformidad y cerrar la orden
-const cerrarOrden = handler(async (req, res) => {
-  const conforme = req.body.conforme !== false; // por defecto true
-  res.json(await svc.darConformidadYCerrar(req.params.ordenId, conforme));
-});
+  comprarRepuestos = asyncHandler(async (req, res) => {
+    res.json(await svc.comprarRepuestos(req.user, req.params.requerimientoId));
+  });
 
-// Entregar el vehiculo
-const entregarVehiculo = handler(async (req, res) => {
-  res.json(await svc.entregarVehiculo(req.params.ordenId));
-});
+  decidirPresupuesto = asyncHandler(async (req, res) => {
+    const { autorizado, motivo } = req.body;
+    if (typeof autorizado !== 'boolean') {
+      throw AppError.badRequest('Debe enviar "autorizado": true|false');
+    }
+    res.json(await svc.decidirPresupuesto(req.user, req.params.presupuestoId, autorizado, motivo));
+  });
 
-// ===== MECANICO =====
+  decidirConformidad = asyncHandler(async (req, res) => {
+    const conforme = req.body.conforme !== false; // por defecto true
+    res.json(await svc.decidirConformidad(req.user, req.params.ordenId, conforme, req.body.motivo));
+  });
 
-// Recibe la orden / consulta detalle
-const verOrden = handler(async (req, res) => {
-  res.json(await svc.obtenerOrden(req.params.ordenId));
-});
+  // ----- Mecanico -----
+  registrarInspeccion = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.registrarInspeccion(req.user, req.params.ordenId, req.body));
+  });
 
-// Realiza la inspeccion (guarda diagnostico + si necesita repuestos)
-const registrarInspeccion = handler(async (req, res) => {
-  res.status(201).json(await svc.registrarInspeccion(req.params.ordenId, req.body));
-});
+  crearRequerimiento = asyncHandler(async (req, res) => {
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) {
+      throw AppError.badRequest('Debe enviar "items": [{ repuesto_id | nombre, cantidad, ... }]');
+    }
+    res.status(201).json(await svc.crearRequerimiento(req.user, req.params.ordenId, items));
+  });
 
-// Genera requerimiento de repuestos
-const crearRequerimiento = handler(async (req, res) => {
-  const { items } = req.body;
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ error: 'Debe enviar "items": [{ nombre, cantidad, ... }]' });
-  }
-  res.status(201).json(await svc.crearRequerimiento(req.params.ordenId, items));
-});
+  generarPresupuesto = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.generarPresupuesto(req.user, req.params.ordenId, req.body));
+  });
 
-// Genera el presupuesto
-const generarPresupuesto = handler(async (req, res) => {
-  res.status(201).json(await svc.generarPresupuesto(req.params.ordenId, req.body));
-});
+  iniciarMantenimiento = asyncHandler(async (req, res) => {
+    res.json(await svc.iniciarMantenimiento(req.user, req.params.ordenId));
+  });
 
-// Genera el informe tecnico (luego de mantenimiento + pruebas)
-const generarInforme = handler(async (req, res) => {
-  res.status(201).json(await svc.generarInforme(req.params.ordenId, req.body));
-});
+  finalizarMantenimiento = asyncHandler(async (req, res) => {
+    res.json(await svc.finalizarMantenimiento(req.user, req.params.ordenId));
+  });
 
-// ===== COMUNES =====
-const listarOrdenes = handler(async (req, res) => {
-  res.json(await svc.listarOrdenes(req.query.estado));
-});
+  generarInforme = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.generarInforme(req.user, req.params.ordenId, req.body));
+  });
+}
 
-module.exports = {
-  listarVehiculosPorMantener,
-  crearOrden,
-  comprarRepuestos,
-  decidirPresupuesto,
-  cerrarOrden,
-  entregarVehiculo,
-  verOrden,
-  registrarInspeccion,
-  crearRequerimiento,
-  generarPresupuesto,
-  generarInforme,
-  listarOrdenes
-};
+module.exports = new MantenimientoController();

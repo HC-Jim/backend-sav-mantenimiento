@@ -1,30 +1,36 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const { env, validar } = require('./config/env');
+const authRoutes = require('./routes/auth.routes');
 const mantenimientoRoutes = require('./routes/mantenimiento.routes');
+const { errorHandler, notFound } = require('./middlewares/error.middleware');
+
+// Falla temprano si falta configuracion critica.
+validar();
 
 const app = express();
 
-app.use(cors());              // permite que NetBeans/otro cliente consuma la API
-app.use(express.json());      // parsea cuerpos JSON
+app.use(cors());          // permite que el frontend Flutter consuma la API
+app.use(express.json());  // parsea cuerpos JSON
 
 // Health check (Render lo usa para saber si el servicio esta vivo)
 app.get('/', (_req, res) => {
-  res.json({ ok: true, servicio: 'API Mantenimiento Preventivo', fecha: new Date().toISOString() });
+  res.json({
+    ok: true,
+    servicio: 'API - Gestion de Ordenes de Mantenimiento',
+    fecha: new Date().toISOString()
+  });
 });
 
-// Rutas del proceso de mantenimiento
+// Rutas
+app.use('/api/auth', authRoutes);
 app.use('/api/mantenimiento', mantenimientoRoutes);
 
-// 404
-app.use((_req, res) => res.status(404).json({ error: 'Ruta no encontrada' }));
+// 404 y manejador de errores (siempre al final)
+app.use(notFound);
+app.use(errorHandler);
 
-// Manejador de errores central
-app.use((err, _req, res, _next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Error interno' });
-});
+app.listen(env.port, () => console.log(`Servidor escuchando en el puerto ${env.port}`));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor escuchando en el puerto ${PORT}`));
+module.exports = app;

@@ -1,14 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
+const { env } = require('./env');
 
-const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en las variables de entorno.');
-  process.exit(1);
-}
-
-// Cliente unico reutilizable. Usa la service_role key: solo vive en el backend.
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+/**
+ * Cliente unico de Supabase (patron singleton).
+ * Usa la SERVICE ROLE KEY: vive solo en el backend, nunca en el frontend.
+ */
+const supabase = createClient(env.supabaseUrl, env.supabaseKey, {
   auth: { persistSession: false }
 });
 

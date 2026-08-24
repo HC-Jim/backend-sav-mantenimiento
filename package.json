@@ -1,7 +1,7 @@
 {
   "name": "backend-sav-mantenimiento",
-  "version": "1.0.0",
-  "description": "API del Proceso de Mantenimiento Preventivo - Sistema de Gestion de Alquiler de Vehiculos (AutoRent Peru)",
+  "version": "2.0.0",
+  "description": "API del Proceso de Gestion de Ordenes de Mantenimiento - Sistema de Alquiler de Vehiculos (AutoRent Peru)",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
   }
 }

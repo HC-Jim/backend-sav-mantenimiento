@@ -1,225 +1,272 @@
-const supabase = require('../config/supabase');
+const ordenRepo = require('../repositories/orden.repository');
+const vehiculoRepo = require('../repositories/vehiculo.repository');
+const repuestoRepo = require('../repositories/repuesto.repository');
+const usuarioRepo = require('../repositories/usuario.repository');
+const { EstadoOrden, Estado, Rol } = require('../domain/EstadoOrden');
+const AppError = require('../utils/AppError');
 
-// Envuelve la respuesta de supabase y lanza error si lo hay.
-function unwrap({ data, error }) {
-  if (error) throw new Error(error.message);
-  return data;
+/**
+ * Orquesta el proceso de Gestion de Ordenes de Mantenimiento (CUS003).
+ *
+ * Todos los metodos que avanzan el flujo reciben el usuario que actua
+ * (con su rol) y validan la transicion contra la maquina de estados
+ * antes de tocar la base de datos.
+ */
+class MantenimientoService {
+  // ============ CONSULTAS ============
+  async vehiculosPorMantener() {
+    const hoy = new Date().toISOString().slice(0, 10);
+    return vehiculoRepo.porMantener(hoy);
+  }
+
+  async catalogoRepuestos() {
+    return repuestoRepo.listar();
+  }
+
+  async listarMecanicos() {
+    return usuarioRepo.listarPorRol(Rol.MECANICO);
+  }
+
+  async obtenerOrden(ordenId) {
+    const orden = await ordenRepo.buscarPorId(ordenId);
+    if (!orden) throw AppError.notFound('Orden no encontrada');
+    return orden;
+  }
+
+  async listarOrdenes(estado) {
+    return ordenRepo.listar(estado);
+  }
+
+  // ============ 1. CREAR ORDEN (Jefe) ============
+  async crearOrden(usuario, datos) {
+    if (usuario.rol !== Rol.JEFE_LOGISTICA) {
+      throw AppError.forbidden('Solo el Jefe de Logistica puede crear ordenes');
+    }
+    const vehiculo = await vehiculoRepo.buscarPorId(datos.vehiculo_id);
+    if (!vehiculo) throw AppError.notFound('Vehiculo no encontrado');
+    if (vehiculo.estado === 'EN_MANTENIMIENTO') {
+      throw AppError.conflict('El vehiculo ya tiene una orden de mantenimiento en curso');
+    }
+
+    const orden = await ordenRepo.crear({
+      vehiculo_id: datos.vehiculo_id,
+      jefe_id: usuario.id,
+      mecanico_id: datos.mecanico_id || null,
+      tipo_servicio: datos.tipo_servicio,
+      descripcion: datos.descripcion
+    });
+    await vehiculoRepo.actualizarEstado(datos.vehiculo_id, 'EN_MANTENIMIENTO');
+    return orden;
+  }
+
+  // ============ 2. INSPECCION (Mecanico) ============
+  async registrarInspeccion(usuario, ordenId, datos) {
+    const orden = await this.#ordenValidada('registrar_inspeccion', ordenId, usuario);
+    const inspeccion = await ordenRepo.crearInspeccion(ordenId, datos);
+    const destino = EstadoOrden.resolverDestinoInspeccion(datos.resultado);
+    await ordenRepo.actualizar(ordenId, { estado: destino });
+    return { inspeccion, estado: destino };
+  }
+
+  // ============ 3. REQUERIMIENTO DE REPUESTOS (Mecanico) ============
+  async crearRequerimiento(usuario, ordenId, items) {
+    await this.#ordenValidada('crear_requerimiento', ordenId, usuario);
+    const req = await ordenRepo.crearRequerimiento(ordenId);
+    const filas = await Promise.all(items.map((it) => this.#normalizarItem(it)));
+    const detalle = await ordenRepo.agregarItems(req.id, filas);
+    return { ...req, repuesto_item: detalle };
+  }
+
+  // ============ 4. GESTIONA Y COMPRA (Jefe) -> descuenta stock ============
+  async comprarRepuestos(usuario, requerimientoId) {
+    const req = await ordenRepo.buscarRequerimiento(requerimientoId);
+    if (!req) throw AppError.notFound('Requerimiento no encontrado');
+    await this.#ordenValidada('comprar_repuestos', req.orden_id, usuario);
+    if (req.estado === 'COMPRADO') {
+      throw AppError.conflict('El requerimiento ya fue comprado');
+    }
+    await this.#descontarStock(req.repuesto_item || []);
+    return ordenRepo.marcarRequerimientoComprado(requerimientoId);
+  }
+
+  // ============ 5. GENERAR PRESUPUESTO (Mecanico) ============
+  async generarPresupuesto(usuario, ordenId, datos) {
+    await this.#ordenValidada('generar_presupuesto', ordenId, usuario);
+
+    const detalle = Array.isArray(datos.detalle) ? datos.detalle : [];
+    const filasDetalle = await Promise.all(detalle.map((d) => this.#normalizarDetalle(d)));
+    const costoRepuestos = filasDetalle.length
+      ? filasDetalle.reduce((acc, f) => acc + f.cantidad * f.precio_unitario, 0)
+      : Number(datos.costo_repuestos || 0);
+
+    const presupuesto = await ordenRepo.crearPresupuesto(ordenId, {
+      costo_repuestos: costoRepuestos,
+      costo_mano_obra: Number(datos.costo_mano_obra || 0)
+    });
+    const detalleGuardado = await ordenRepo.agregarDetallePresupuesto(presupuesto.id, filasDetalle);
+    await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });
+    return { ...presupuesto.toJSON(), detalle_presupuesto: detalleGuardado };
+  }
+
+  // ============ 6. AUTORIZAR / RECHAZAR PRESUPUESTO (Jefe) ============
+  async decidirPresupuesto(usuario, presupuestoId, autorizado, motivo) {
+    const presupuesto = await ordenRepo.buscarPresupuesto(presupuestoId);
+    if (!presupuesto) throw AppError.notFound('Presupuesto no encontrado');
+    const orden = await this.#ordenValidada('decidir_presupuesto', presupuesto.ordenId, usuario);
+
+    const presActualizado = await ordenRepo.actualizarPresupuesto(presupuestoId, {
+      estado: autorizado ? 'AUTORIZADO' : 'RECHAZADO',
+      motivo_rechazo: autorizado ? null : motivo || null
+    });
+
+    if (autorizado) {
+      await ordenRepo.actualizar(orden.id, { estado: Estado.PRESUPUESTO_AUTORIZADO });
+    } else {
+      // Flujo alternativo: presupuesto rechazado -> orden cerrada por rechazo.
+      await ordenRepo.actualizar(orden.id, {
+        estado: Estado.CERRADA_POR_RECHAZO,
+        fecha_cierre: new Date().toISOString()
+      });
+      await vehiculoRepo.actualizarEstado(orden.vehiculoId, 'DISPONIBLE');
+    }
+    return presActualizado;
+  }
+
+  // ============ 7. INICIAR MANTENIMIENTO (Mecanico) ============
+  async iniciarMantenimiento(usuario, ordenId) {
+    await this.#ordenValidada('iniciar_mantenimiento', ordenId, usuario);
+    return ordenRepo.actualizar(ordenId, {
+      estado: Estado.EN_MANTENIMIENTO,
+      hora_inicio_mant: new Date().toISOString()
+    });
+  }
+
+  // ============ 8. FINALIZAR MANTENIMIENTO (Mecanico) ============
+  async finalizarMantenimiento(usuario, ordenId) {
+    await this.#ordenValidada('finalizar_mantenimiento', ordenId, usuario);
+    return ordenRepo.actualizar(ordenId, { hora_fin_mant: new Date().toISOString() });
+  }
+
+  // ============ 9. GENERAR INFORME TECNICO (Mecanico) ============
+  async generarInforme(usuario, ordenId, datos) {
+    await this.#ordenValidada('generar_informe', ordenId, usuario);
+    const informe = await ordenRepo.crearInforme(ordenId, datos);
+    await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_CONFORMIDAD });
+    return informe;
+  }
+
+  // ============ 10. CONFORMIDAD Y CIERRE (Jefe) ============
+  async decidirConformidad(usuario, ordenId, conforme, motivo) {
+    const orden = await this.#ordenValidada('decidir_conformidad', ordenId, usuario);
+
+    if (!conforme) {
+      // Flujo alternativo: rechazo de conformidad -> vuelve al mecanico.
+      await ordenRepo.actualizarUltimoInforme(ordenId, {
+        conforme: false,
+        motivo_correccion: motivo || null
+      });
+      return ordenRepo.actualizar(ordenId, { estado: Estado.CORRECCION_REQUERIDA });
+    }
+
+    await ordenRepo.actualizarUltimoInforme(ordenId, { conforme: true });
+    const acta = await ordenRepo.crearActaEntrega(ordenId, {
+      generado_por: usuario.id,
+      contenido: this.#redactarActa(orden, usuario)
+    });
+    const ordenCerrada = await ordenRepo.actualizar(ordenId, {
+      estado: Estado.CERRADO,
+      fecha_cierre: new Date().toISOString()
+    });
+    const hoy = new Date().toISOString().slice(0, 10);
+    await vehiculoRepo.actualizarEstado(orden.vehiculoId, 'DISPONIBLE', {
+      fecha_ultimo_mantenimiento: hoy
+    });
+    return { orden: ordenCerrada, acta_entrega: acta };
+  }
+
+  // ============ Helpers privados ============
+
+  /** Carga la orden y valida la transicion; devuelve la orden. */
+  async #ordenValidada(accion, ordenId, usuario) {
+    const orden = await ordenRepo.buscarPorId(ordenId);
+    if (!orden) throw AppError.notFound('Orden no encontrada');
+    const { ok, motivo } = EstadoOrden.validar(accion, orden.estado, usuario.rol);
+    if (!ok) throw AppError.conflict(motivo);
+    return orden;
+  }
+
+  /** Normaliza un item de requerimiento, tomando el precio del catalogo si aplica. */
+  async #normalizarItem(it) {
+    let precio = Number(it.precio_unitario || 0);
+    let nombre = it.nombre;
+    let referencia = it.referencia || null;
+    if (it.repuesto_id) {
+      const rep = await repuestoRepo.buscarPorId(it.repuesto_id);
+      if (!rep) throw AppError.badRequest(`Repuesto ${it.repuesto_id} no existe en el catalogo`);
+      precio = precio || rep.costoUnitario;
+      nombre = nombre || rep.nombre;
+      referencia = referencia || rep.referencia;
+    }
+    return {
+      repuesto_id: it.repuesto_id || null,
+      nombre,
+      referencia,
+      cantidad: it.cantidad || 1,
+      precio_unitario: precio,
+      no_catalogado: !it.repuesto_id
+    };
+  }
+
+  /** Normaliza una linea de detalle de presupuesto. */
+  async #normalizarDetalle(d) {
+    let precio = Number(d.precio_unitario || 0);
+    let descripcion = d.descripcion;
+    if (d.repuesto_id) {
+      const rep = await repuestoRepo.buscarPorId(d.repuesto_id);
+      if (!rep) throw AppError.badRequest(`Repuesto ${d.repuesto_id} no existe en el catalogo`);
+      precio = precio || rep.costoUnitario;
+      descripcion = descripcion || rep.nombre;
+    }
+    return {
+      repuesto_id: d.repuesto_id || null,
+      descripcion: descripcion || 'Item',
+      cantidad: d.cantidad || 1,
+      precio_unitario: precio
+    };
+  }
+
+  /** Descuenta del catalogo el stock de los items comprados. */
+  async #descontarStock(items) {
+    for (const item of items) {
+      if (!item.repuesto_id) continue; // items no catalogados no afectan stock
+      const rep = await repuestoRepo.buscarPorId(item.repuesto_id);
+      if (!rep) continue;
+      if (!rep.hayStock(item.cantidad)) {
+        throw AppError.conflict(
+          `Stock insuficiente de "${rep.nombre}" (disponible ${rep.stock}, requerido ${item.cantidad})`
+        );
+      }
+    }
+    // Segunda pasada: aplica el descuento una vez validado todo.
+    for (const item of items) {
+      if (!item.repuesto_id) continue;
+      const rep = await repuestoRepo.buscarPorId(item.repuesto_id);
+      await repuestoRepo.ajustarStock(rep.id, rep.stock - item.cantidad);
+    }
+  }
+
+  #redactarActa(orden, jefe) {
+    const fecha = new Date().toLocaleString('es-PE');
+    const placa = orden.vehiculo?.placa || `vehiculo #${orden.vehiculoId}`;
+    return (
+      `ACTA DE ENTREGA - Orden de Mantenimiento #${orden.id}\n` +
+      `Vehiculo: ${placa}\n` +
+      `Tipo de servicio: ${orden.tipoServicio || '-'}\n` +
+      `Conformidad otorgada por: ${jefe.nombre} (Jefe de Logistica)\n` +
+      `Fecha de entrega: ${fecha}\n` +
+      `El vehiculo se entrega conforme, habiendose completado el mantenimiento.`
+    );
+  }
 }
 
-// ---------- VEHICULOS ----------
-async function vehiculosQueRequierenMantenimiento() {
-  // "Revisar las fechas de los mantenimientos": vehiculos con proximo mantenimiento vencido o proximo.
-  const hoy = new Date().toISOString().slice(0, 10);
-  return unwrap(
-    await supabase
-      .from('vehiculo')
-      .select('*')
-      .lte('fecha_proximo_mantenimiento', hoy)
-      .order('fecha_proximo_mantenimiento', { ascending: true })
-  );
-}
-
-async function actualizarEstadoVehiculo(vehiculoId, estado) {
-  return unwrap(
-    await supabase.from('vehiculo').update({ estado }).eq('id', vehiculoId).select().single()
-  );
-}
-
-// ---------- ORDEN DE MANTENIMIENTO ----------
-async function crearOrden(datos) {
-  const orden = unwrap(
-    await supabase
-      .from('orden_mantenimiento')
-      .insert({
-        vehiculo_id: datos.vehiculo_id,
-        jefe_logistica: datos.jefe_logistica,
-        mecanico: datos.mecanico || null,
-        tipo_servicio: datos.tipo_servicio,
-        descripcion: datos.descripcion,
-        estado: 'CREADA'
-      })
-      .select()
-      .single()
-  );
-  await actualizarEstadoVehiculo(datos.vehiculo_id, 'EN_MANTENIMIENTO');
-  return orden;
-}
-
-async function obtenerOrden(ordenId) {
-  return unwrap(
-    await supabase
-      .from('orden_mantenimiento')
-      .select(`*,
-        vehiculo:vehiculo_id (*),
-        inspeccion (*),
-        requerimiento_repuesto ( *, repuesto_item (*) ),
-        presupuesto (*),
-        informe_tecnico (*)`)
-      .eq('id', ordenId)
-      .single()
-  );
-}
-
-async function listarOrdenes(estado) {
-  let q = supabase
-    .from('orden_mantenimiento')
-    .select('*, vehiculo:vehiculo_id (placa, marca, modelo)')
-    .order('fecha_creacion', { ascending: false });
-  if (estado) q = q.eq('estado', estado);
-  return unwrap(await q);
-}
-
-async function cambiarEstadoOrden(ordenId, estado, extra = {}) {
-  return unwrap(
-    await supabase
-      .from('orden_mantenimiento')
-      .update({ estado, ...extra })
-      .eq('id', ordenId)
-      .select()
-      .single()
-  );
-}
-
-// ---------- INSPECCION ----------
-async function registrarInspeccion(ordenId, datos) {
-  const insp = unwrap(
-    await supabase
-      .from('inspeccion')
-      .insert({
-        orden_id: ordenId,
-        diagnostico: datos.diagnostico,
-        necesita_repuestos: !!datos.necesita_repuestos,
-        hora_inicio: datos.hora_inicio || null,
-        hora_fin: datos.hora_fin || null
-      })
-      .select()
-      .single()
-  );
-  await cambiarEstadoOrden(ordenId, 'INSPECCIONADA');
-  return insp;
-}
-
-// ---------- REQUERIMIENTO DE REPUESTOS ----------
-async function crearRequerimiento(ordenId, items) {
-  const req = unwrap(
-    await supabase
-      .from('requerimiento_repuesto')
-      .insert({ orden_id: ordenId, estado: 'SOLICITADO' })
-      .select()
-      .single()
-  );
-  const filas = items.map((it) => ({
-    requerimiento_id: req.id,
-    nombre: it.nombre,
-    referencia: it.referencia || null,
-    cantidad: it.cantidad || 1,
-    precio_unitario: it.precio_unitario || 0
-  }));
-  const detalle = unwrap(await supabase.from('repuesto_item').insert(filas).select());
-  return { ...req, repuesto_item: detalle };
-}
-
-async function marcarRepuestosComprados(requerimientoId) {
-  return unwrap(
-    await supabase
-      .from('requerimiento_repuesto')
-      .update({ estado: 'COMPRADO' })
-      .eq('id', requerimientoId)
-      .select()
-      .single()
-  );
-}
-
-// ---------- PRESUPUESTO ----------
-async function generarPresupuesto(ordenId, datos) {
-  const pres = unwrap(
-    await supabase
-      .from('presupuesto')
-      .insert({
-        orden_id: ordenId,
-        costo_repuestos: datos.costo_repuestos || 0,
-        costo_mano_obra: datos.costo_mano_obra || 0,
-        estado: 'PENDIENTE'
-      })
-      .select()
-      .single()
-  );
-  await cambiarEstadoOrden(ordenId, 'PRESUPUESTO_GENERADO');
-  return pres;
-}
-
-async function decidirPresupuesto(presupuestoId, autorizado, motivo) {
-  const pres = unwrap(
-    await supabase
-      .from('presupuesto')
-      .update({
-        estado: autorizado ? 'AUTORIZADO' : 'RECHAZADO',
-        motivo_rechazo: autorizado ? null : motivo || null
-      })
-      .eq('id', presupuestoId)
-      .select()
-      .single()
-  );
-  // Actualiza la OM segun la decision (gateway "Presupuesto autorizado?")
-  await cambiarEstadoOrden(
-    pres.orden_id,
-    autorizado ? 'AUTORIZADA' : 'RECHAZADA',
-    autorizado ? {} : { fecha_cierre: new Date().toISOString() }
-  );
-  return pres;
-}
-
-// ---------- INFORME TECNICO ----------
-async function generarInforme(ordenId, datos) {
-  const inf = unwrap(
-    await supabase
-      .from('informe_tecnico')
-      .insert({
-        orden_id: ordenId,
-        trabajos_realizados: datos.trabajos_realizados,
-        repuestos_instalados: datos.repuestos_instalados,
-        resultados_pruebas: datos.resultados_pruebas,
-        observaciones: datos.observaciones,
-        tiempo_inicio: datos.tiempo_inicio || null,
-        tiempo_fin: datos.tiempo_fin || null
-      })
-      .select()
-      .single()
-  );
-  await cambiarEstadoOrden(ordenId, 'INFORME_GENERADO');
-  return inf;
-}
-
-// ---------- CIERRE Y ENTREGA ----------
-async function darConformidadYCerrar(ordenId, conforme) {
-  await supabase
-    .from('informe_tecnico')
-    .update({ conforme })
-    .eq('orden_id', ordenId);
-  return cambiarEstadoOrden(ordenId, 'CERRADA', { fecha_cierre: new Date().toISOString() });
-}
-
-async function entregarVehiculo(ordenId) {
-  const orden = await cambiarEstadoOrden(ordenId, 'ENTREGADA');
-  const hoy = new Date().toISOString().slice(0, 10);
-  await supabase
-    .from('vehiculo')
-    .update({ estado: 'DISPONIBLE', fecha_ultimo_mantenimiento: hoy })
-    .eq('id', orden.vehiculo_id);
-  return orden;
-}
-
-module.exports = {
-  vehiculosQueRequierenMantenimiento,
-  crearOrden,
-  obtenerOrden,
-  listarOrdenes,
-  registrarInspeccion,
-  crearRequerimiento,
-  marcarRepuestosComprados,
-  generarPresupuesto,
-  decidirPresupuesto,
-  generarInforme,
-  darConformidadYCerrar,
-  entregarVehiculo
-};
+module.exports = new MantenimientoService();

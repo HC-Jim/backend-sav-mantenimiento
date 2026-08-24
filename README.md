@@ -1,138 +1,191 @@
-# API - Proceso de Mantenimiento Preventivo
+# API - Gestión de Órdenes de Mantenimiento
 
-Backend (Controlador MVC) en **Node.js + Express**. Modelo en **Supabase (PostgreSQL)**.
-Vista en **Apache NetBeans (Java)** que consume esta API por HTTP.
+Backend en **Node.js + Express** con arquitectura **MVC por capas + clases de dominio**.
+Modelo de datos en **Supabase (PostgreSQL)**. Frontend en **Flutter** que consume esta API por HTTP.
 
-Actores del proceso: **Jefe de Logística** y **Mecánico**.
+Proceso implementado: **CUS003 – Gestionar el Mantenimiento Vehicular**.
+Actores: **Jefe de Logística** y **Mecánico** (acceso por roles mediante login JWT).
 
 ---
 
-## 1. Puesta en marcha local
+## 1. Arquitectura (MVC + capas)
+
+```
+src/
+├── config/          env.js (variables) · supabase.js (cliente único)
+├── domain/          EstadoOrden.js  ← máquina de estados del BPMN + roles
+├── models/          Clases de dominio: Usuario, Vehiculo, Repuesto,
+│                    OrdenMantenimiento, Presupuesto
+├── repositories/    Acceso a datos (Supabase) por entidad
+├── services/        Lógica de negocio: auth · mantenimiento
+├── controllers/     Reciben la petición HTTP y delegan al servicio
+├── routes/          Definen endpoints + middleware de auth/roles
+├── middlewares/     auth (JWT + roles) · manejo central de errores
+├── utils/           AppError · asyncHandler · db · helpers
+└── server.js        Punto de entrada (Express)
+```
+
+**Flujo de una petición:** `routes → middleware (auth/rol) → controller → service → repository → Supabase`.
+El *controller* es fino; la lógica y la validación de estados viven en el *service* y en `domain/EstadoOrden`.
+
+---
+
+## 2. Puesta en marcha local
 
 ```bash
 npm install
-cp .env.example .env      # completa SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY
+cp .env.example .env      # completa SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY y JWT_SECRET
 npm start
 ```
 
-Antes: en Supabase → **SQL Editor**, ejecuta `sql/schema.sql` para crear las tablas.
+Antes: en Supabase → **SQL Editor**, ejecuta `sql/schema.sql` (crea tablas + datos de ejemplo).
 
-Prueba: abre `http://localhost:3000/` → debe responder `{ "ok": true, ... }`.
+Prueba: abre `http://localhost:3000/` → responde `{ "ok": true, ... }`.
+
+**Usuarios de ejemplo (creados por el schema):**
+
+| Rol | Email | Contraseña |
+|-----|-------|-----------|
+| Jefe de Logística | `jefe@autorent.pe` | `jefe123` |
+| Mecánico | `mecanico@autorent.pe` | `mecanico123` |
 
 ---
 
-## 2. Flujo BPMN → Endpoints
-
-El estado de la **Orden de Mantenimiento (OM)** avanza automáticamente en cada paso:
+## 3. Autenticación
 
 ```
-CREADA → INSPECCIONADA → PRESUPUESTO_GENERADO
-       → AUTORIZADA | RECHAZADA
-       → INFORME_GENERADO → CERRADA → ENTREGADA
+POST /api/auth/login      { "email": "...", "password": "..." }  → { token, usuario }
+GET  /api/auth/me         (Bearer token)                         → perfil
 ```
+
+Todas las rutas de `/api/mantenimiento` exigen la cabecera:
+
+```
+Authorization: Bearer <token>
+```
+
+El rol del token decide qué acciones se permiten (RBAC).
+
+---
+
+## 4. Máquina de estados de la Orden de Mantenimiento
+
+```
+PENDIENTE_INSPECCION
+   └─(inspección)→ INSPECCION_COMPLETA ──(sin hallazgos)─────────────┐
+                        │                                            │
+                        │(genera presupuesto)                        │
+                        ▼                                            │
+        PENDIENTE_AUTORIZACION_PRESUPUESTO                           │
+              │(jefe decide)                                         │
+      ┌───────┴────────┐                                            │
+      ▼                ▼                                            │
+ CERRADA_POR_RECHAZO   PRESUPUESTO_AUTORIZADO ──(iniciar)──►  EN_MANTENIMIENTO ◄┘
+   (final)                                                          │(finalizar + informe)
+                                                                    ▼
+                                                          PENDIENTE_CONFORMIDAD
+                                                             │(jefe decide)
+                                                     ┌───────┴────────┐
+                                                     ▼                ▼
+                                              CORRECCION_REQUERIDA   CERRADO (final)
+                                              (vuelve al mecánico)   + Acta de Entrega
+```
+
+Alternativo: `INSPECCION_POSTERGADA` (el mecánico posterga con justificación).
+
+La clase `domain/EstadoOrden` valida **cada** transición (estado origen válido + rol correcto)
+antes de tocar la base de datos, de modo que el proceso no se pueda saltar pasos.
+
+---
+
+## 5. Endpoints (BPMN → ruta)
 
 | # | Paso BPMN | Actor | Método y ruta |
 |---|-----------|-------|---------------|
-| 1 | Revisar fechas de mantenimiento | Jefe | `GET /api/mantenimiento/vehiculos/por-mantener` |
-| 2 | Crea la orden de mantenimiento | Jefe | `POST /api/mantenimiento/ordenes` |
-| 3 | Recibe la orden | Mecánico | `GET /api/mantenimiento/ordenes/:ordenId` |
-| 4 | Realiza la inspección | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/inspeccion` |
-| 5 | Genera requerimiento de repuestos *(si aplica)* | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/requerimientos` |
-| 6 | Gestiona y compra | Jefe | `PATCH /api/mantenimiento/requerimientos/:requerimientoId/comprar` |
-| 7 | Genera el presupuesto | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/presupuesto` |
-| 8 | Revisa y autoriza / rechaza presupuesto | Jefe | `PATCH /api/mantenimiento/presupuestos/:presupuestoId/decidir` |
-| 9 | Genera el informe técnico *(tras mantenimiento + pruebas)* | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/informe` |
-| 10 | Da conformidad y cierra la orden | Jefe | `PATCH /api/mantenimiento/ordenes/:ordenId/cerrar` |
-| 11 | Entrega el vehículo | Jefe | `PATCH /api/mantenimiento/ordenes/:ordenId/entregar` |
+| — | Revisar fechas de mantenimiento | Jefe | `GET /api/mantenimiento/vehiculos/por-mantener` |
+| — | Ver catálogo de repuestos | Ambos | `GET /api/mantenimiento/repuestos` |
+| 1 | Crear la orden | Jefe | `POST /api/mantenimiento/ordenes` |
+| 3 | Recibir / ver la orden | Mecánico | `GET /api/mantenimiento/ordenes/:ordenId` |
+| 2 | Registrar inspección / hallazgos | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/inspeccion` |
+| 5 | Generar requerimiento de repuestos | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/requerimientos` |
+| 6 | Gestiona y compra (descuenta stock) | Jefe | `PATCH /api/mantenimiento/requerimientos/:requerimientoId/comprar` |
+| 7 | Generar presupuesto (con detalle) | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/presupuesto` |
+| 8 | Autorizar / rechazar presupuesto | Jefe | `PATCH /api/mantenimiento/presupuestos/:presupuestoId/decidir` |
+| 9a | Iniciar mantenimiento (hora inicio) | Mecánico | `PATCH /api/mantenimiento/ordenes/:ordenId/iniciar` |
+| 9b | Finalizar mantenimiento (hora fin) | Mecánico | `PATCH /api/mantenimiento/ordenes/:ordenId/finalizar` |
+| 9c | Generar informe técnico | Mecánico | `POST /api/mantenimiento/ordenes/:ordenId/informe` |
+| 10 | Dar conformidad y cerrar (+ Acta) / rechazar | Jefe | `PATCH /api/mantenimiento/ordenes/:ordenId/conformidad` |
 
-Listado general con filtro opcional: `GET /api/mantenimiento/ordenes?estado=CREADA`
+Listado con filtro: `GET /api/mantenimiento/ordenes?estado=PENDIENTE_INSPECCION`
 
 ### Ejemplos de cuerpo (JSON)
 
-**2. Crear OM**
+**Login**
 ```json
-{ "vehiculo_id": 1, "jefe_logistica": "Ana Ruiz", "mecanico": "Luis Paz",
-  "tipo_servicio": "Preventivo 50,000 km", "descripcion": "Cambio de aceite y filtros" }
+{ "email": "jefe@autorent.pe", "password": "jefe123" }
 ```
-**4. Inspección**
+**1. Crear OM** *(jefe_id se toma del token)*
 ```json
-{ "diagnostico": "Frenos desgastados", "necesita_repuestos": true,
-  "hora_inicio": "2026-08-22T09:00:00Z", "hora_fin": "2026-08-22T09:40:00Z" }
+{ "vehiculo_id": 1, "mecanico_id": 2, "tipo_servicio": "Preventivo 50,000 km", "descripcion": "Cambio de aceite y filtros" }
 ```
-**5. Requerimiento de repuestos**
+**2. Inspección**
 ```json
-{ "items": [ { "nombre": "Pastillas de freno", "referencia": "BR-450", "cantidad": 1, "precio_unitario": 120.0 } ] }
+{ "diagnostico": "Frenos desgastados", "resultado": "CON_HALLAZGOS", "necesita_repuestos": true,
+  "kilometraje_lectura": 48200, "nivel_combustible": "1/2", "observaciones": "Ruido al frenar" }
 ```
-**7. Presupuesto**
+**5. Requerimiento de repuestos** *(usa el catálogo con `repuesto_id`, o texto libre)*
 ```json
-{ "costo_repuestos": 120.0, "costo_mano_obra": 80.0 }
+{ "items": [ { "repuesto_id": 1, "cantidad": 1 }, { "nombre": "Junta especial", "cantidad": 2, "precio_unitario": 15.0 } ] }
+```
+**7. Presupuesto** *(el costo de repuestos se calcula del detalle)*
+```json
+{ "costo_mano_obra": 80.0, "detalle": [ { "repuesto_id": 1, "cantidad": 1 }, { "repuesto_id": 3, "cantidad": 4 } ] }
 ```
 **8. Decisión de presupuesto**
 ```json
 { "autorizado": true }
 ```
-**9. Informe técnico**
+**9c. Informe técnico**
 ```json
-{ "trabajos_realizados": "Cambio de pastillas", "repuestos_instalados": "Pastillas BR-450",
+{ "trabajos_realizados": "Cambio de pastillas y aceite", "repuestos_instalados": "BR-450, AC-530 x4",
   "resultados_pruebas": "OK", "observaciones": "Ninguna" }
 ```
-
----
-
-## 3. Consumir la API desde NetBeans (Java 11+)
-
-```java
-import java.net.URI;
-import java.net.http.*;
-
-public class MantenimientoAPI {
-    private static final String BASE = "http://localhost:3000/api/mantenimiento";
-    private final HttpClient http = HttpClient.newHttpClient();
-
-    // Ejemplo: crear una Orden de Mantenimiento
-    public String crearOrden(int vehiculoId, String jefe, String tipoServicio) throws Exception {
-        String json = """
-            { "vehiculo_id": %d, "jefe_logistica": "%s", "tipo_servicio": "%s" }
-            """.formatted(vehiculoId, jefe, tipoServicio);
-
-        HttpRequest req = HttpRequest.newBuilder()
-            .uri(URI.create(BASE + "/ordenes"))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(json))
-            .build();
-
-        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
-        return res.body(); // luego parsea con Gson/Jackson
-    }
-
-    // Ejemplo GET: vehículos que requieren mantenimiento
-    public String vehiculosPorMantener() throws Exception {
-        HttpRequest req = HttpRequest.newBuilder()
-            .uri(URI.create(BASE + "/vehiculos/por-mantener"))
-            .GET().build();
-        return http.send(req, HttpResponse.BodyHandlers.ofString()).body();
-    }
-}
+**10. Conformidad** *(rechazo: `{ "conforme": false, "motivo": "..." }` → CORRECCION_REQUERIDA)*
+```json
+{ "conforme": true }
 ```
 
-Para parsear el JSON recomiendo **Gson** (`com.google.code.gson`) o **Jackson**.
-En producción, cambia `BASE` por la URL de Render (ver abajo).
+---
 
-> **Importante:** NetBeans nunca habla con Supabase directamente. Solo llama a esta API.
-> La `SERVICE_ROLE_KEY` vive **solo** en el backend.
+## 6. Consumir la API desde Flutter
+
+```dart
+// Login
+final res = await http.post(
+  Uri.parse('$base/api/auth/login'),
+  headers: {'Content-Type': 'application/json'},
+  body: jsonEncode({'email': email, 'password': password}),
+);
+final token = jsonDecode(res.body)['token'];
+
+// Llamada autenticada
+final ordenes = await http.get(
+  Uri.parse('$base/api/mantenimiento/ordenes'),
+  headers: {'Authorization': 'Bearer $token'},
+);
+```
+
+> El backend nunca expone la `SERVICE_ROLE_KEY`: vive solo aquí. Flutter solo habla con esta API.
 
 ---
 
-## 4. Despliegue en Render (gratis)
+## 7. Despliegue en Render
 
-1. Sube este proyecto a un repo de GitHub.
+1. Sube el repo a GitHub.
 2. En [render.com](https://render.com) → **New → Web Service** → conecta el repo.
-3. Configuración:
-   - **Build Command:** `npm install`
-   - **Start Command:** `npm start`
-   - **Environment:** agrega `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`
-     (Render define `PORT` automáticamente; el código ya lo usa).
-4. Deploy. Tu API quedará en `https://tu-servicio.onrender.com`.
+3. **Build:** `npm install` · **Start:** `npm start`
+4. Variables de entorno: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`
+   (Render define `PORT` automáticamente).
 
 > El plan gratis "duerme" el servicio tras ~15 min de inactividad; la primera
-> petición luego de dormir tarda unos segundos en responder.
+> petición luego tarda unos segundos.
