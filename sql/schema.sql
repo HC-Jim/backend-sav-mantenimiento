@@ -1,24 +1,31 @@
 -- ============================================================
 --  SISTEMA DE ALQUILER DE VEHICULOS - AutoRent Peru
---  Modulo: GESTION DE ORDENES DE MANTENIMIENTO (CUS003)
+--  MODELO DE DATOS COMPLETO (todos los modulos)
 --  Motor: PostgreSQL (Supabase -> SQL Editor)
 --
---  Estados de la Orden de Mantenimiento (segun el informe / BPMN):
---    PENDIENTE_INSPECCION -> INSPECCION_COMPLETA
---         -> PENDIENTE_AUTORIZACION_PRESUPUESTO
---         -> PRESUPUESTO_AUTORIZADO | CERRADA_POR_RECHAZO
---         -> EN_MANTENIMIENTO -> PENDIENTE_CONFORMIDAD
---         -> CERRADO | CORRECCION_REQUERIDA
---    Alternativo: INSPECCION_POSTERGADA
+--  Convencion: cada entidad usa una PK surrogate "id" (bigint) y los
+--  codigos de negocio (placa, numero_documento, num_poliza, ...) quedan
+--  como columnas UNIQUE. Las relaciones se hacen por id.
+--
+--  Modulos:
+--    * Seguridad:      usuario
+--    * Alquiler:       cliente, vehiculo, reserva, alquiler, pago, comprobante, seguro
+--    * Mantenimiento:  orden_mantenimiento, inspeccion, requerimiento_repuesto,
+--                      repuesto_item, presupuesto, detalle_presupuesto,
+--                      repuesto, informe_tecnico, acta_entrega
 -- ============================================================
 
--- Para reinstalar desde cero, descomenta el bloque siguiente:
--- drop table if exists acta_entrega, informe_tecnico, detalle_presupuesto,
---   presupuesto, repuesto_item, requerimiento_repuesto, inspeccion,
---   orden_mantenimiento, repuesto, vehiculo, usuario cascade;
+-- ---------- Reinstalacion limpia (borra todo y recrea) ----------
+drop table if exists
+  acta_entrega, informe_tecnico, detalle_presupuesto, presupuesto,
+  repuesto_item, requerimiento_repuesto, inspeccion, orden_mantenimiento,
+  comprobante, pago, alquiler, reserva, seguro, repuesto, vehiculo,
+  cliente, usuario cascade;
 
--- ---------- USUARIO (actores del proceso) ----------
-create table if not exists usuario (
+-- ============================================================
+--  MODULO SEGURIDAD
+-- ============================================================
+create table usuario (
   id            bigint generated always as identity primary key,
   nombre        varchar(100) not null,
   email         varchar(120) not null unique,
@@ -28,22 +35,103 @@ create table if not exists usuario (
   creado_en     timestamptz  default now()
 );
 
--- ---------- VEHICULO ----------
-create table if not exists vehiculo (
+-- ============================================================
+--  MODULO ALQUILER
+-- ============================================================
+create table cliente (
+  id               bigint generated always as identity primary key,
+  tipo_documento   varchar(20),          -- DNI | RUC | CE
+  numero_documento varchar(20) not null unique,
+  razon_social     varchar(150),         -- nombre o razon social
+  licencia_conducir varchar(30),
+  telefono         varchar(20),
+  correo           varchar(120),
+  creado_en        timestamptz default now()
+);
+
+create table vehiculo (
   id                          bigint generated always as identity primary key,
   placa                       varchar(10) not null unique,
   marca                       varchar(50),
   modelo                      varchar(50),
   anio                        integer,
-  kilometraje                 integer default 0,
+  color                       varchar(30),
+  kilometraje                 integer default 0,      -- kilometraje actual
+  tarifa_diaria               numeric(10,2) default 0,
   fecha_ultimo_mantenimiento  date,
   fecha_proximo_mantenimiento date,
-  estado                      varchar(20) default 'DISPONIBLE',  -- DISPONIBLE | EN_MANTENIMIENTO
+  estado                      varchar(20) default 'DISPONIBLE', -- DISPONIBLE | ALQUILADO | EN_MANTENIMIENTO
   creado_en                   timestamptz default now()
 );
 
--- ---------- REPUESTO (catalogo con stock) ----------
-create table if not exists repuesto (
+create table reserva (
+  id                   bigint generated always as identity primary key,
+  cliente_id           bigint not null references cliente(id),
+  fecha_solicitud      timestamptz default now(),
+  fecha_inicio         date,
+  fecha_fin            date,
+  estado               varchar(20) default 'PENDIENTE', -- PENDIENTE | CONFIRMADA | CANCELADA | FINALIZADA
+  monto_total_estimado numeric(10,2) default 0,
+  creado_en            timestamptz default now()
+);
+
+create table alquiler (
+  id                    bigint generated always as identity primary key,
+  reserva_id            bigint references reserva(id),
+  vehiculo_id           bigint not null references vehiculo(id),
+  fecha_hora_entrega    timestamptz,
+  fecha_hora_devolucion timestamptz,
+  kilometraje_salida    integer,
+  kilometraje_retorno   integer,
+  estado                varchar(20) default 'ACTIVO', -- ACTIVO | FINALIZADO
+  observaciones_entrega text,
+  creado_en             timestamptz default now()
+);
+
+create table pago (
+  id          bigint generated always as identity primary key,
+  alquiler_id bigint references alquiler(id),
+  reserva_id  bigint references reserva(id),
+  monto       numeric(10,2) not null default 0,
+  fecha       timestamptz default now(),
+  tipo        varchar(30),      -- EFECTIVO | TARJETA | TRANSFERENCIA
+  estado      varchar(20) default 'PAGADO',
+  creado_en   timestamptz default now()
+);
+
+create table comprobante (
+  id              bigint generated always as identity primary key,
+  pago_id         bigint not null references pago(id),
+  tipo            varchar(20),      -- BOLETA | FACTURA
+  fecha_emision   timestamptz default now(),
+  monto_total     numeric(10,2) default 0,
+  archivo_xml_pdf text,             -- ruta o URL del documento
+  creado_en       timestamptz default now()
+);
+
+create table seguro (
+  id                  bigint generated always as identity primary key,
+  vehiculo_id         bigint not null references vehiculo(id),
+  tipo_seguro         varchar(30),      -- SOAT | TODO_RIESGO
+  num_poliza          varchar(40) unique,
+  aseguradora_entidad varchar(100),
+  fecha_emision       date,
+  fecha_vencimiento   date,
+  archivo_adjunto     text,
+  creado_en           timestamptz default now()
+);
+
+-- ============================================================
+--  MODULO MANTENIMIENTO (CUS003)
+--  Estados de la Orden (BPMN):
+--    PENDIENTE_INSPECCION -> INSPECCION_COMPLETA
+--       -> PENDIENTE_AUTORIZACION_PRESUPUESTO
+--       -> PRESUPUESTO_AUTORIZADO | CERRADA_POR_RECHAZO
+--       -> EN_MANTENIMIENTO -> PENDIENTE_CONFORMIDAD
+--       -> CERRADO | CORRECCION_REQUERIDA
+--    Alternativo: INSPECCION_POSTERGADA
+-- ============================================================
+create table repuesto (
   id             bigint generated always as identity primary key,
   nombre         varchar(120) not null,
   referencia     varchar(60) unique,
@@ -52,29 +140,27 @@ create table if not exists repuesto (
   creado_en      timestamptz default now()
 );
 
--- ---------- ORDEN DE MANTENIMIENTO (OM) ----------
--- Documento central del flujo. La columna "estado" refleja el avance en el BPMN.
-create table if not exists orden_mantenimiento (
+create table orden_mantenimiento (
   id             bigint generated always as identity primary key,
   vehiculo_id    bigint not null references vehiculo(id),
   jefe_id        bigint references usuario(id),      -- quien crea la OM
   mecanico_id    bigint references usuario(id),      -- asignado
   tipo_servicio  varchar(100),
   descripcion    text,
+  prioridad      varchar(10) default 'MEDIA',        -- ALTA | MEDIA | BAJA
   estado         varchar(35) not null default 'PENDIENTE_INSPECCION',
-  hora_inicio_mant timestamptz,   -- "Iniciar Mantenimiento" (SLA)
-  hora_fin_mant    timestamptz,   -- "Finalizar Mantenimiento" (SLA)
+  hora_inicio_mant timestamptz,
+  hora_fin_mant    timestamptz,
   fecha_creacion timestamptz default now(),
   fecha_cierre   timestamptz
 );
 
--- ---------- INSPECCION (Detalle de Inspeccion) ----------
-create table if not exists inspeccion (
+create table inspeccion (
   id                 bigint generated always as identity primary key,
   orden_id           bigint not null references orden_mantenimiento(id) on delete cascade,
   diagnostico        text,
   resultado          varchar(20) default 'CON_HALLAZGOS', -- CON_HALLAZGOS | SIN_HALLAZGOS | POSTERGADA
-  justificacion      text,               -- si se posterga
+  justificacion      text,
   necesita_repuestos boolean default false,
   kilometraje_lectura integer,
   nivel_combustible  varchar(20),
@@ -84,38 +170,37 @@ create table if not exists inspeccion (
   creado_en          timestamptz default now()
 );
 
--- ---------- REQUERIMIENTO / REQUISICION DE REPUESTOS ----------
-create table if not exists requerimiento_repuesto (
+create table requerimiento_repuesto (
   id         bigint generated always as identity primary key,
   orden_id   bigint not null references orden_mantenimiento(id) on delete cascade,
   estado     varchar(20) default 'SOLICITADO',  -- SOLICITADO | COMPRADO
   creado_en  timestamptz default now()
 );
 
-create table if not exists repuesto_item (
+create table repuesto_item (
   id               bigint generated always as identity primary key,
   requerimiento_id bigint not null references requerimiento_repuesto(id) on delete cascade,
-  repuesto_id      bigint references repuesto(id),  -- null = item no catalogado
+  repuesto_id      bigint references repuesto(id),
   nombre           varchar(120) not null,
   referencia       varchar(60),
   cantidad         integer not null default 1,
   precio_unitario  numeric(10,2) default 0,
-  no_catalogado    boolean default false  -- flujo alt: "Pendiente de Cotizacion Externa"
+  no_catalogado    boolean default false
 );
 
--- ---------- PRESUPUESTO (cabecera + detalle) ----------
-create table if not exists presupuesto (
+create table presupuesto (
   id              bigint generated always as identity primary key,
   orden_id        bigint not null references orden_mantenimiento(id) on delete cascade,
   costo_repuestos numeric(10,2) default 0,
   costo_mano_obra numeric(10,2) default 0,
+  horas_hombre    numeric(6,2) default 0,
   total           numeric(10,2) generated always as (costo_repuestos + costo_mano_obra) stored,
   estado          varchar(20) default 'PENDIENTE',  -- PENDIENTE | AUTORIZADO | RECHAZADO
   motivo_rechazo  text,
   creado_en       timestamptz default now()
 );
 
-create table if not exists detalle_presupuesto (
+create table detalle_presupuesto (
   id             bigint generated always as identity primary key,
   presupuesto_id bigint not null references presupuesto(id) on delete cascade,
   repuesto_id    bigint references repuesto(id),
@@ -125,21 +210,19 @@ create table if not exists detalle_presupuesto (
   subtotal       numeric(10,2) generated always as (cantidad * precio_unitario) stored
 );
 
--- ---------- INFORME TECNICO ----------
-create table if not exists informe_tecnico (
+create table informe_tecnico (
   id                   bigint generated always as identity primary key,
   orden_id             bigint not null references orden_mantenimiento(id) on delete cascade,
   trabajos_realizados  text,
   repuestos_instalados text,
   resultados_pruebas   text,
   observaciones        text,
-  conforme             boolean,          -- lo marca el Jefe al dar conformidad
-  motivo_correccion    text,             -- si el Jefe rechaza la conformidad
+  conforme             boolean,
+  motivo_correccion    text,
   creado_en            timestamptz default now()
 );
 
--- ---------- ACTA DE ENTREGA (se genera al cerrar) ----------
-create table if not exists acta_entrega (
+create table acta_entrega (
   id           bigint generated always as identity primary key,
   orden_id     bigint not null unique references orden_mantenimiento(id) on delete cascade,
   generado_por bigint references usuario(id),
@@ -150,24 +233,20 @@ create table if not exists acta_entrega (
 -- ============================================================
 --  DATOS DE EJEMPLO
 -- ============================================================
-
--- Usuarios (contrasenas: jefe123 / mecanico123)
 insert into usuario (nombre, email, password_hash, rol) values
   ('Ana Ruiz',  'jefe@autorent.pe',     '$2a$10$.x/GETs7R/aQ92XcLguIJeHpTDNy9lkdT1ii9IFGvy.NpyjaQLfjK', 'JEFE_LOGISTICA'),
-  ('Luis Paz',  'mecanico@autorent.pe', '$2a$10$VHH77PME/T1.sJU7w9x.HORRwC.x.StF7GLvbEaym4hvrMAl81xTO', 'MECANICO')
-on conflict (email) do nothing;
+  ('Luis Paz',  'mecanico@autorent.pe', '$2a$10$VHH77PME/T1.sJU7w9x.HORRwC.x.StF7GLvbEaym4hvrMAl81xTO', 'MECANICO');
 
--- Vehiculos
-insert into vehiculo (placa, marca, modelo, anio, kilometraje, fecha_ultimo_mantenimiento, fecha_proximo_mantenimiento)
-values
-  ('ABC-123', 'Toyota', 'Yaris', 2021, 48000, '2026-02-10', '2026-08-10'),
-  ('XYZ-789', 'Kia',    'Rio',   2022, 12000, '2026-07-01', '2027-01-01')
-on conflict (placa) do nothing;
+insert into cliente (tipo_documento, numero_documento, razon_social, licencia_conducir, telefono, correo) values
+  ('DNI', '45871236', 'Carla Mendoza',       'Q45871236', '987654321', 'carla@example.com'),
+  ('RUC', '20512345671', 'Transportes SAC',  '-',         '01-4567890', 'ventas@transportes.pe');
 
--- Catalogo de repuestos
+insert into vehiculo (placa, marca, modelo, anio, color, kilometraje, tarifa_diaria, fecha_ultimo_mantenimiento, fecha_proximo_mantenimiento) values
+  ('ABC-123', 'Toyota', 'Yaris', 2021, 'Blanco', 48000, 120.00, '2026-02-10', '2026-08-10'),
+  ('XYZ-789', 'Kia',    'Rio',   2022, 'Gris',   12000, 110.00, '2026-07-01', '2027-01-01');
+
 insert into repuesto (nombre, referencia, costo_unitario, stock) values
   ('Pastillas de freno delanteras', 'BR-450', 120.00, 8),
   ('Filtro de aceite',              'FO-101',  35.00, 20),
   ('Aceite sintetico 5W-30 (L)',    'AC-530',  45.00, 40),
-  ('Filtro de aire',                'FA-220',  28.00, 15)
-on conflict (referencia) do nothing;
+  ('Filtro de aire',                'FA-220',  28.00, 15);
