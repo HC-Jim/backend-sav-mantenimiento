@@ -29,6 +29,7 @@ drop table if exists comprobante cascade;
 drop table if exists pago cascade;
 drop table if exists alquiler cascade;
 drop table if exists reserva cascade;
+drop table if exists cotizacion cascade;
 drop table if exists seguro cascade;
 drop table if exists repuesto cascade;
 drop table if exists vehiculo cascade;
@@ -82,10 +83,29 @@ create table vehiculo (
   creado_en                   timestamptz default now()
 );
 
+-- Cotizacion: la genera el Asesor de Ventas; el Cliente la acepta/rechaza y
+-- paga la garantia. Al pagarse, el Asesor genera la Orden de Reserva.
+create table cotizacion (
+  id                   bigint generated always as identity primary key,
+  cliente_id           bigint not null references cliente(id),
+  vehiculo_id          bigint not null references vehiculo(id),
+  asesor_id            bigint references usuario(id),
+  fecha_inicio         date,
+  fecha_fin            date,
+  dias                 integer default 1,
+  tarifa_dia           numeric(10,2) default 0,
+  monto_total_estimado numeric(10,2) default 0,
+  garantia_monto       numeric(10,2) default 0,
+  -- PENDIENTE | ACEPTADA | RECHAZADA | GARANTIA_SOLICITADA | GARANTIA_PAGADA | CONVERTIDA
+  estado               varchar(25) default 'PENDIENTE',
+  creado_en            timestamptz default now()
+);
+
 create table reserva (
   id                   bigint generated always as identity primary key,
   cliente_id           bigint not null references cliente(id),
   vehiculo_id          bigint references vehiculo(id),
+  cotizacion_id        bigint references cotizacion(id),
   fecha_solicitud      timestamptz default now(),
   fecha_inicio         date,
   fecha_fin            date,
@@ -117,6 +137,7 @@ create table pago (
   id          bigint generated always as identity primary key,
   alquiler_id bigint references alquiler(id),
   reserva_id  bigint references reserva(id),
+  cotizacion_id bigint references cotizacion(id),
   monto       numeric(10,2) not null default 0,
   fecha       timestamptz default now(),
   concepto    varchar(20) default 'ALQUILER', -- GARANTIA | ALQUILER | DEVOLUCION
