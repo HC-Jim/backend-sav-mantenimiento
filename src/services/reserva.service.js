@@ -182,10 +182,16 @@ class ReservaService {
   }
 
   async #reservaValidada(accion, usuario, reservaId) {
-    this.#exigirCliente(usuario);
     const reserva = await reservaRepo.buscarPorId(reservaId);
     if (!reserva) throw AppError.notFound('Reserva no encontrada');
-    this.#verificarPropiedad(usuario, reserva);
+    // Cliente: solo su propia reserva. Cajero: cualquiera (atencion en ventanilla).
+    if (usuario.rol === Rol.CLIENTE) {
+      if (!usuario.clienteId || reserva.clienteId !== usuario.clienteId) {
+        throw AppError.forbidden('No puedes operar una reserva de otro cliente');
+      }
+    } else if (usuario.rol !== Rol.CAJERO) {
+      throw AppError.forbidden('Esta accion la realiza el Cliente o el Cajero');
+    }
     const { ok, motivo } = MaquinaReserva.validar(accion, reserva.estado);
     if (!ok) throw AppError.conflict(motivo);
     return reserva;
