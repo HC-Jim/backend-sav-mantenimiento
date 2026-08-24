@@ -23,6 +23,9 @@ const Estado = Object.freeze({
 const Rol = Object.freeze({
   JEFE_LOGISTICA: 'JEFE_LOGISTICA',
   MECANICO: 'MECANICO',
+  ADMINISTRADOR: 'ADMINISTRADOR',
+  ASESOR_VENTAS: 'ASESOR_VENTAS',
+  CAJERO: 'CAJERO',
   CLIENTE: 'CLIENTE'
 });
 

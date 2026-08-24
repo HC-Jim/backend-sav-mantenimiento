@@ -43,7 +43,7 @@ create table usuario (
   nombre        varchar(100) not null,
   email         varchar(120) not null unique,
   password_hash varchar(100) not null,
-  rol           varchar(20)  not null check (rol in ('JEFE_LOGISTICA', 'MECANICO', 'CLIENTE')),
+  rol           varchar(20)  not null check (rol in ('JEFE_LOGISTICA', 'MECANICO', 'ADMINISTRADOR', 'ASESOR_VENTAS', 'CAJERO', 'CLIENTE')),
   cliente_id    bigint,        -- solo para rol CLIENTE (FK agregada tras crear la tabla cliente)
   estado        varchar(20)  not null default 'ACTIVO',
   creado_en     timestamptz  default now()
@@ -274,10 +274,13 @@ insert into cliente (tipo_documento, numero_documento, razon_social, licencia_co
   ('DNI', '45871236', 'Carla Mendoza',       'Q45871236', '987654321', 'carla@autorent.pe'),
   ('RUC', '20512345671', 'Transportes SAC',  '-',         '01-4567890', 'ventas@transportes.pe');
 
--- Usuarios (contrasenas: jefe123 / mecanico123 / cliente123)
+-- Usuarios (contrasenas: jefe123 / mecanico123 / admin123 / asesor123 / cajero123 / cliente123)
 insert into usuario (nombre, email, password_hash, rol, cliente_id) values
   ('Ana Ruiz',      'jefe@autorent.pe',     '$2a$10$.x/GETs7R/aQ92XcLguIJeHpTDNy9lkdT1ii9IFGvy.NpyjaQLfjK', 'JEFE_LOGISTICA', null),
   ('Luis Paz',      'mecanico@autorent.pe', '$2a$10$VHH77PME/T1.sJU7w9x.HORRwC.x.StF7GLvbEaym4hvrMAl81xTO', 'MECANICO', null),
+  ('Sofia Vega',    'admin@autorent.pe',    '$2a$10$Mj3sii6EKlW93MSWipFLSe9gBV2phEhddju8xDyFvgAOh163oG0mC', 'ADMINISTRADOR', null),
+  ('Diego Rios',    'asesor@autorent.pe',   '$2a$10$u2HAtFsSS5y5kJYe5nI.c.9m9r7YZ5o7W7f6tGWxgdo.GM6gkQbRi', 'ASESOR_VENTAS', null),
+  ('Marta Lima',    'cajero@autorent.pe',   '$2a$10$6TyGrunKa4Eibc/aYH6QxeAVSvozM3LR2NUhiTDBQ9vxUQeCppaoe', 'CAJERO', null),
   ('Carla Mendoza', 'carla@autorent.pe',    '$2a$10$SEX8ramyv3td9154X1qWkeiOZp9I7iuRFKPHJHpHCYh4ss.DVm0mG', 'CLIENTE',
      (select id from cliente where numero_documento = '45871236'));
 

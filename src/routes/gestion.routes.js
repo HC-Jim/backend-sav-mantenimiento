@@ -5,33 +5,38 @@ const { Rol } = require('../domain/EstadoOrden');
 
 const router = Router();
 
-// Toda la administracion interna es del Jefe de Logistica.
-router.use(autenticar, exigirRol(Rol.JEFE_LOGISTICA));
+// Todo requiere autenticacion; el rol se valida por ruta.
+router.use(autenticar);
+
+// Administracion de flota/precios/seguros: Jefe de Logistica y Administrador.
+const admin = exigirRol(Rol.JEFE_LOGISTICA, Rol.ADMINISTRADOR);
+// Clientes: ademas el Asesor de Ventas (Mantener Cliente / CRUD Cliente).
+const clientes = exigirRol(Rol.JEFE_LOGISTICA, Rol.ADMINISTRADOR, Rol.ASESOR_VENTAS);
 
 // ---- Vehiculos (Mantener Vehiculo) ----
-router.get('/vehiculos', c.listarVehiculos);
-router.post('/vehiculos', c.crearVehiculo);
-router.patch('/vehiculos/:id', c.actualizarVehiculo);
-router.delete('/vehiculos/:id', c.eliminarVehiculo);
+router.get('/vehiculos', admin, c.listarVehiculos);
+router.post('/vehiculos', admin, c.crearVehiculo);
+router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);
+router.delete('/vehiculos/:id', admin, c.eliminarVehiculo);
 
-// ---- Clientes (Mantener Cliente) ----
-router.get('/clientes', c.listarClientes);
-router.post('/clientes', c.crearCliente);
-router.patch('/clientes/:id', c.actualizarCliente);
-router.delete('/clientes/:id', c.eliminarCliente);
+// ---- Clientes (Mantener Cliente / CRUD Cliente) ----
+router.get('/clientes', clientes, c.listarClientes);
+router.post('/clientes', clientes, c.crearCliente);
+router.patch('/clientes/:id', clientes, c.actualizarCliente);
+router.delete('/clientes/:id', clientes, c.eliminarCliente);
 
 // ---- Seguros / Polizas (CUS017 / CUS018) ----
-router.get('/seguros', c.listarSeguros);
-router.get('/seguros/por-vencer', c.segurosPorVencer);   // ?dias=30
-router.post('/seguros', c.crearSeguro);
-router.post('/seguros/:id/renovar', c.renovarSeguro);    // Registrar Renovacion de Seguro
-router.patch('/seguros/:id', c.actualizarSeguro);
-router.delete('/seguros/:id', c.eliminarSeguro);
+router.get('/seguros', admin, c.listarSeguros);
+router.get('/seguros/por-vencer', admin, c.segurosPorVencer);
+router.post('/seguros', admin, c.crearSeguro);
+router.post('/seguros/:id/renovar', admin, c.renovarSeguro);   // Registrar Renovacion de Seguro
+router.patch('/seguros/:id', admin, c.actualizarSeguro);
+router.delete('/seguros/:id', admin, c.eliminarSeguro);
 
 // ---- Catalogo de Precios (Registrar Catalogo de Precios) ----
-router.get('/precios', c.listarPrecios);
-router.post('/precios', c.crearPrecio);
-router.patch('/precios/:id', c.actualizarPrecio);
-router.delete('/precios/:id', c.eliminarPrecio);
+router.get('/precios', admin, c.listarPrecios);
+router.post('/precios', admin, c.crearPrecio);
+router.patch('/precios/:id', admin, c.actualizarPrecio);
+router.delete('/precios/:id', admin, c.eliminarPrecio);
 
 module.exports = router;

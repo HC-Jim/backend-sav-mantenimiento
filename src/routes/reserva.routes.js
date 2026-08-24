@@ -13,8 +13,8 @@ router.get('/vehiculos', c.catalogo);                 // ?todos=true para inclui
 router.get('/vehiculos/:vehiculoId', c.detalleVehiculo);
 router.get('/disponibilidad', c.disponibilidad);      // ?vehiculo_id=&fecha_inicio=&fecha_fin=
 
-// ---- Gestion interna (Jefe de Logistica) ----
-router.get('/reservas/todas', exigirRol(Rol.JEFE_LOGISTICA), c.listarTodas);
+// ---- Gestion interna (Jefe, Cajero, Asesor de Ventas) ----
+router.get('/reservas/todas', exigirRol(Rol.JEFE_LOGISTICA, Rol.CAJERO, Rol.ASESOR_VENTAS), c.listarTodas);
 
 // ---- Cliente ----
 router.post('/reservas', exigirRol(Rol.CLIENTE), c.crearReserva);
