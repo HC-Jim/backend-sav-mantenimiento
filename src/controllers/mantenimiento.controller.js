@@ -28,6 +28,11 @@ class MantenimientoController {
     res.json(await svc.obtenerOrden(req.params.ordenId));
   });
 
+  // <<include>> Generar Documentos de Costos
+  documentosDeCostos = asyncHandler(async (req, res) => {
+    res.json(await svc.documentosDeCostos(req.params.ordenId));
+  });
+
   // ----- Jefe de Logistica -----
   crearOrden = asyncHandler(async (req, res) => {
     const { vehiculo_id, tipo_servicio } = req.body;

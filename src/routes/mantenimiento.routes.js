@@ -11,6 +11,7 @@ router.use(autenticar);
 // ---- Consultas (ambos roles) ----
 router.get('/ordenes', c.listarOrdenes);                 // ?estado=... (opcional)
 router.get('/ordenes/:ordenId', c.verOrden);             // Mecanico "recibe la orden"
+router.get('/ordenes/:ordenId/documentos-costos', c.documentosDeCostos); // <<include>> Generar Documentos de Costos
 router.get('/vehiculos/por-mantener', c.listarVehiculosPorMantener);
 router.get('/repuestos', c.listarCatalogo);              // catalogo de repuestos
 router.get('/mecanicos', exigirRol(Rol.JEFE_LOGISTICA), c.listarMecanicos); // para asignar OM

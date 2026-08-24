@@ -2,6 +2,8 @@ const ordenRepo = require('../repositories/orden.repository');
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const repuestoRepo = require('../repositories/repuesto.repository');
 const usuarioRepo = require('../repositories/usuario.repository');
+const busqueda = require('./busqueda.service');              // <<include>> Buscar Vehiculo
+const documentosCosto = require('./documentosCosto.service'); // <<include>> Generar Documentos de Costos
 const { EstadoOrden, Estado, Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
 
@@ -37,13 +39,17 @@ class MantenimientoService {
     return ordenRepo.listar(estado);
   }
 
+  // <<include>> Generar Documentos de Costos
+  async documentosDeCostos(ordenId) {
+    return documentosCosto.generarParaOrden(ordenId);
+  }
+
   // ============ 1. CREAR ORDEN (Jefe) ============
   async crearOrden(usuario, datos) {
     if (usuario.rol !== Rol.JEFE_LOGISTICA) {
       throw AppError.forbidden('Solo el Jefe de Logistica puede crear ordenes');
     }
-    const vehiculo = await vehiculoRepo.buscarPorId(datos.vehiculo_id);
-    if (!vehiculo) throw AppError.notFound('Vehiculo no encontrado');
+    const vehiculo = await busqueda.buscarVehiculo(datos.vehiculo_id); // <<include>> Buscar Vehiculo
     if (vehiculo.estado === 'EN_MANTENIMIENTO') {
       throw AppError.conflict('El vehiculo ya tiene una orden de mantenimiento en curso');
     }

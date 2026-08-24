@@ -1,5 +1,7 @@
 const reservaRepo = require('../repositories/reserva.repository');
 const vehiculoRepo = require('../repositories/vehiculo.repository');
+const busqueda = require('./busqueda.service');          // <<include>> Buscar Vehiculo
+const comprobante = require('./comprobante.service');     // <<include>> Emitir Comprobante
 const PoliticasAlquiler = require('../domain/PoliticasAlquiler');
 const { EstadoReserva, MaquinaReserva } = require('../domain/EstadoReserva');
 const { Rol } = require('../domain/EstadoOrden');
@@ -19,15 +21,12 @@ class ReservaService {
   }
 
   async detalleVehiculo(vehiculoId) {
-    const v = await vehiculoRepo.buscarPorId(vehiculoId);
-    if (!v) throw AppError.notFound('Vehiculo no encontrado');
-    return v;
+    return busqueda.buscarVehiculo(vehiculoId); // <<include>> Buscar Vehiculo
   }
 
   async verificarDisponibilidad(vehiculoId, fechaInicio, fechaFin) {
     this.#validarFechas(fechaInicio, fechaFin);
-    const v = await vehiculoRepo.buscarPorId(vehiculoId);
-    if (!v) throw AppError.notFound('Vehiculo no encontrado');
+    const v = await busqueda.buscarVehiculo(vehiculoId); // <<include>> Buscar Vehiculo
     if (v.estado === 'EN_MANTENIMIENTO') {
       return { disponible: false, motivo: 'El vehiculo esta en mantenimiento' };
     }
@@ -44,8 +43,7 @@ class ReservaService {
     if (!vehiculo_id) throw AppError.badRequest('vehiculo_id es obligatorio');
     this.#validarFechas(fecha_inicio, fecha_fin);
 
-    const vehiculo = await vehiculoRepo.buscarPorId(vehiculo_id);
-    if (!vehiculo) throw AppError.notFound('Vehiculo no encontrado');
+    const vehiculo = await busqueda.buscarVehiculo(vehiculo_id); // <<include>> Buscar Vehiculo
 
     const disp = await this.verificarDisponibilidad(vehiculo_id, fecha_inicio, fecha_fin);
     if (!disp.disponible) throw AppError.conflict(disp.motivo);
@@ -92,15 +90,12 @@ class ReservaService {
       metodo: metodo || 'TARJETA',
       estado: 'PAGADO'
     });
-    const comprobante = await reservaRepo.crearComprobante({
-      pago_id: pago.id,
-      tipo: 'BOLETA',
-      monto_total: reserva.garantiaMonto
-    });
+    // <<include>> Emitir Comprobante
+    const comp = await comprobante.emitir({ pago_id: pago.id, monto_total: reserva.garantiaMonto });
 
     const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.CONFIRMADA });
     await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'ALQUILADO');
-    return { reserva: actualizada, pago, comprobante };
+    return { reserva: actualizada, pago, comprobante: comp };
   }
 
   // ============ PAGAR ALQUILER + DEVOLVER GARANTIA (finaliza) ============
@@ -116,9 +111,8 @@ class ReservaService {
       metodo: metodo || 'TARJETA',
       estado: 'PAGADO'
     });
-    await reservaRepo.crearComprobante({
-      pago_id: pagoAlquiler.id, tipo: 'BOLETA', monto_total: reserva.montoTotalEstimado
-    });
+    // <<include>> Emitir Comprobante
+    await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: reserva.montoTotalEstimado });
 
     // Registro del alquiler (entrega/devolucion en esta demo ocurren al finalizar)
     const ahora = new Date().toISOString();
