@@ -1,26 +1,24 @@
-const precioRepo = require('../repositories/catalogoPrecio.repository');
 const AppError = require('../utils/AppError');
 
 /**
- * Calcula el precio por dia aplicable a un vehiculo segun su categoria y la
- * cantidad de dias del alquiler (precio normal o de campania).
+ * Calcula el precio por dia aplicable a un vehiculo segun sus propios precios
+ * (normal o de campania) y la cantidad de dias del alquiler.
  */
 class PrecioService {
-  async tarifaPara(categoria, dias) {
-    if (!categoria) {
-      throw AppError.badRequest('El vehiculo no tiene categoria asignada; configurala en Gestion de Vehiculos');
+  tarifaPara(vehiculo, dias) {
+    if (!vehiculo) throw AppError.notFound('Vehiculo no encontrado');
+    if (!vehiculo.precioNormal || vehiculo.precioNormal <= 0) {
+      throw AppError.badRequest(
+        `El vehiculo ${vehiculo.placa || ''} no tiene precio configurado; asignalo en Catalogo de Precios`
+      );
     }
-    const precio = await precioRepo.buscarPorCategoria(categoria);
-    if (!precio) {
-      throw AppError.badRequest(`La categoria "${categoria}" no tiene precio configurado en el Catalogo de Precios`);
-    }
-    const tarifa = precio.precioPara(dias);
+    const tarifa = vehiculo.precioPara(dias);
     return {
       tarifa,
-      aplicado: (precio.precioCampania > 0 && dias >= precio.diasMinCampania) ? 'CAMPANIA' : 'NORMAL',
-      precio_regular: precio.precioRegular,
-      precio_normal: precio.precioNormal,
-      precio_campania: precio.precioCampania
+      aplicado: (vehiculo.precioCampania > 0 && dias >= vehiculo.diasMinCampania) ? 'CAMPANIA' : 'NORMAL',
+      precio_regular: vehiculo.precioRegular,
+      precio_normal: vehiculo.precioNormal,
+      precio_campania: vehiculo.precioCampania
     };
   }
 }

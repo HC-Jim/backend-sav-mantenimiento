@@ -1,7 +1,6 @@
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const clienteRepo = require('../repositories/cliente.repository');
 const seguroRepo = require('../repositories/seguro.repository');
-const precioRepo = require('../repositories/catalogoPrecio.repository');
 const AppError = require('../utils/AppError');
 
 /**
@@ -33,9 +32,30 @@ class GestionService {
     });
   }
 
-  async actualizarVehiculo(id, cambios) {
+  /** Editar datos del vehiculo (Gestion de Vehiculos): sin precios. */
+  async actualizarVehiculo(id, datos) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
-    return vehiculoRepo.actualizar(id, cambios);
+    return vehiculoRepo.actualizar(id, {
+      sku: datos.sku,
+      placa: datos.placa,
+      marca: datos.marca,
+      modelo: datos.modelo,
+      anio: datos.anio,
+      color: datos.color,
+      categoria: datos.categoria
+    });
+  }
+
+  /** Editar el precio del vehiculo (Catalogo de Precios): regular/normal/campania. */
+  async actualizarPrecioVehiculo(id, datos) {
+    await this.#existe(vehiculoRepo, id, 'Vehiculo');
+    const p = this.#validarPrecios(datos);
+    return vehiculoRepo.actualizar(id, {
+      precio_regular: p.regular,
+      precio_normal: p.normal,
+      precio_campania: p.campania,
+      dias_min_campania: p.diasMin
+    });
   }
 
   async eliminarVehiculo(id) {
@@ -123,41 +143,6 @@ class GestionService {
     });
   }
 
-  // ---------- CATALOGO DE PRECIOS ----------
-  listarPrecios() {
-    return precioRepo.listar();
-  }
-
-  crearPrecio(datos) {
-    if (!datos.categoria) throw AppError.badRequest('La categoria es obligatoria');
-    const p = this.#validarPrecios(datos);
-    return precioRepo.crear({
-      categoria: datos.categoria,
-      descripcion: datos.descripcion,
-      precio_regular: p.regular,
-      precio_normal: p.normal,
-      precio_campania: p.campania,
-      dias_min_campania: p.diasMin,
-      vigente: datos.vigente !== false
-    });
-  }
-
-  async actualizarPrecio(id, cambios) {
-    await this.#existe(precioRepo, id, 'Precio');
-    // Si vienen precios, validarlos.
-    if (cambios.precio_regular != null || cambios.precio_normal != null) {
-      const p = this.#validarPrecios(cambios);
-      cambios = {
-        ...cambios,
-        precio_regular: p.regular,
-        precio_normal: p.normal,
-        precio_campania: p.campania,
-        dias_min_campania: p.diasMin
-      };
-    }
-    return precioRepo.actualizar(id, cambios);
-  }
-
   /** Valida y normaliza los precios: el regular debe ser mayor al normal. */
   #validarPrecios(datos) {
     const regular = Number(datos.precio_regular || 0);
@@ -168,11 +153,6 @@ class GestionService {
       throw AppError.badRequest('El precio regular debe ser mayor al precio normal');
     }
     return { regular, normal, campania, diasMin };
-  }
-
-  async eliminarPrecio(id) {
-    await this.#existe(precioRepo, id, 'Precio');
-    return precioRepo.eliminar(id);
   }
 
   // ---------- helper ----------

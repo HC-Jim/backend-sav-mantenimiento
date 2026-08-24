@@ -13,10 +13,11 @@ const admin = exigirRol(Rol.ADMINISTRADOR);
 // Clientes (Mantener Cliente / CRUD Cliente): Asesor de Ventas y Administrador.
 const clientes = exigirRol(Rol.ASESOR_VENTAS, Rol.ADMINISTRADOR);
 
-// ---- Vehiculos (Mantener Vehiculo) ----
+// ---- Vehiculos (Mantener Vehiculo + precio por vehiculo) ----
 router.get('/vehiculos', admin, c.listarVehiculos);
 router.post('/vehiculos', admin, c.crearVehiculo);
-router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);
+router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);          // Gestion de Vehiculos (datos)
+router.patch('/vehiculos/:id/precio', admin, c.actualizarPrecioVehiculo); // Catalogo de Precios (precio)
 router.delete('/vehiculos/:id', admin, c.eliminarVehiculo);
 
 // ---- Clientes (Mantener Cliente / CRUD Cliente) ----
@@ -32,11 +33,5 @@ router.post('/seguros', admin, c.crearSeguro);
 router.post('/seguros/:id/renovar', admin, c.renovarSeguro);   // Registrar Renovacion de Seguro
 router.patch('/seguros/:id', admin, c.actualizarSeguro);
 router.delete('/seguros/:id', admin, c.eliminarSeguro);
-
-// ---- Catalogo de Precios (Registrar Catalogo de Precios) ----
-router.get('/precios', admin, c.listarPrecios);
-router.post('/precios', admin, c.crearPrecio);
-router.patch('/precios/:id', admin, c.actualizarPrecio);
-router.delete('/precios/:id', admin, c.eliminarPrecio);
 
 module.exports = router;

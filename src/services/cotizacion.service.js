@@ -32,7 +32,7 @@ class CotizacionService {
     if (solapan.length > 0) throw AppError.conflict('El vehiculo ya esta reservado en esas fechas');
 
     const dias = PoliticasAlquiler.diasEntre(fecha_inicio, fecha_fin);
-    const { tarifa } = await precioService.tarifaPara(vehiculo.categoria, dias);
+    const { tarifa } = precioService.tarifaPara(vehiculo, dias);
 
     return cotizacionRepo.crear({
       cliente_id,
