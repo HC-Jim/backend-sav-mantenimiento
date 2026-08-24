@@ -1,6 +1,7 @@
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const clienteRepo = require('../repositories/cliente.repository');
 const seguroRepo = require('../repositories/seguro.repository');
+const precioRepo = require('../repositories/catalogoPrecio.repository');
 const AppError = require('../utils/AppError');
 
 /**
@@ -98,6 +99,52 @@ class GestionService {
   async eliminarSeguro(id) {
     await this.#existe(seguroRepo, id, 'Seguro');
     return seguroRepo.eliminar(id);
+  }
+
+  /**
+   * Registrar Renovación de Seguro (CUS - Torres): a partir de una poliza
+   * existente, crea una nueva vigencia para el mismo vehiculo con nuevas
+   * fechas/numero de poliza.
+   */
+  async renovarSeguro(id, datos) {
+    const anterior = await this.#existe(seguroRepo, id, 'Seguro');
+    if (!datos.fecha_emision || !datos.fecha_vencimiento) {
+      throw AppError.badRequest('fecha_emision y fecha_vencimiento son obligatorias para renovar');
+    }
+    return seguroRepo.crear({
+      vehiculo_id: anterior.vehiculoId,
+      tipo_seguro: datos.tipo_seguro || anterior.tipoSeguro,
+      num_poliza: datos.num_poliza || anterior.numPoliza,
+      aseguradora_entidad: datos.aseguradora_entidad || anterior.aseguradoraEntidad,
+      fecha_emision: datos.fecha_emision,
+      fecha_vencimiento: datos.fecha_vencimiento,
+      archivo_adjunto: datos.archivo_adjunto || null
+    });
+  }
+
+  // ---------- CATALOGO DE PRECIOS ----------
+  listarPrecios() {
+    return precioRepo.listar();
+  }
+
+  crearPrecio(datos) {
+    if (!datos.categoria) throw AppError.badRequest('La categoria es obligatoria');
+    return precioRepo.crear({
+      categoria: datos.categoria,
+      descripcion: datos.descripcion,
+      precio_dia: datos.precio_dia || 0,
+      vigente: datos.vigente !== false
+    });
+  }
+
+  async actualizarPrecio(id, cambios) {
+    await this.#existe(precioRepo, id, 'Precio');
+    return precioRepo.actualizar(id, cambios);
+  }
+
+  async eliminarPrecio(id) {
+    await this.#existe(precioRepo, id, 'Precio');
+    return precioRepo.eliminar(id);
   }
 
   // ---------- helper ----------

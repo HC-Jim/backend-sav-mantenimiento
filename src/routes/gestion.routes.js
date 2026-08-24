@@ -24,7 +24,14 @@ router.delete('/clientes/:id', c.eliminarCliente);
 router.get('/seguros', c.listarSeguros);
 router.get('/seguros/por-vencer', c.segurosPorVencer);   // ?dias=30
 router.post('/seguros', c.crearSeguro);
+router.post('/seguros/:id/renovar', c.renovarSeguro);    // Registrar Renovacion de Seguro
 router.patch('/seguros/:id', c.actualizarSeguro);
 router.delete('/seguros/:id', c.eliminarSeguro);
+
+// ---- Catalogo de Precios (Registrar Catalogo de Precios) ----
+router.get('/precios', c.listarPrecios);
+router.post('/precios', c.crearPrecio);
+router.patch('/precios/:id', c.actualizarPrecio);
+router.delete('/precios/:id', c.eliminarPrecio);
 
 module.exports = router;

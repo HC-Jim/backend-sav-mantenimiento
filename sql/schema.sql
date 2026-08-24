@@ -24,6 +24,7 @@ drop table if exists repuesto_item cascade;
 drop table if exists requerimiento_repuesto cascade;
 drop table if exists inspeccion cascade;
 drop table if exists orden_mantenimiento cascade;
+drop table if exists catalogo_precio cascade;
 drop table if exists comprobante cascade;
 drop table if exists pago cascade;
 drop table if exists alquiler cascade;
@@ -144,6 +145,16 @@ create table seguro (
   fecha_vencimiento   date,
   archivo_adjunto     text,
   creado_en           timestamptz default now()
+);
+
+-- Catalogo de precios (tarifa por categoria de vehiculo)
+create table catalogo_precio (
+  id          bigint generated always as identity primary key,
+  categoria   varchar(50) not null,
+  descripcion varchar(150),
+  precio_dia  numeric(10,2) not null default 0,
+  vigente     boolean default true,
+  creado_en   timestamptz default now()
 );
 
 -- ============================================================
@@ -273,6 +284,12 @@ insert into usuario (nombre, email, password_hash, rol, cliente_id) values
 insert into vehiculo (placa, marca, modelo, anio, color, kilometraje, tarifa_diaria, fecha_ultimo_mantenimiento, fecha_proximo_mantenimiento) values
   ('ABC-123', 'Toyota', 'Yaris', 2021, 'Blanco', 48000, 120.00, '2026-02-10', '2026-08-10'),
   ('XYZ-789', 'Kia',    'Rio',   2022, 'Gris',   12000, 110.00, '2026-07-01', '2027-01-01');
+
+insert into catalogo_precio (categoria, descripcion, precio_dia) values
+  ('Economico', 'Autos compactos de bajo consumo', 110.00),
+  ('Sedan',     'Autos medianos 4 puertas',        150.00),
+  ('SUV',       'Camionetas familiares',           220.00),
+  ('Premium',   'Vehiculos de alta gama',          350.00);
 
 insert into repuesto (nombre, referencia, costo_unitario, stock) values
   ('Pastillas de freno delanteras', 'BR-450', 120.00, 8),
