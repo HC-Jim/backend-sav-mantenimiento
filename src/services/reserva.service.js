@@ -98,12 +98,12 @@ class ReservaService {
     return { reserva: actualizada, pago, comprobante: comp };
   }
 
-  // ============ PAGAR ALQUILER + DEVOLVER GARANTIA (finaliza) ============
-  async pagarAlquilerYDevolver(usuario, reservaId, { metodo, deducciones = 0 } = {}) {
+  // ============ PAGAR ALQUILER (Cliente/Cajero) -> EN_CURSO ============
+  // Registra el pago del alquiler y entrega el vehiculo. La garantia queda
+  // retenida; el Cajero la devuelve luego con "Devolver Garantia".
+  async pagarAlquiler(usuario, reservaId, { metodo } = {}) {
     const reserva = await this.#reservaValidada('pagar_alquiler', usuario, reservaId);
-    const ded = Math.max(Number(deducciones) || 0, 0);
 
-    // Pago del alquiler
     const pagoAlquiler = await reservaRepo.crearPago({
       reserva_id: reserva.id,
       monto: reserva.montoTotalEstimado,
@@ -112,25 +112,41 @@ class ReservaService {
       estado: 'PAGADO'
     });
     // <<include>> Emitir Comprobante
-    await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: reserva.montoTotalEstimado });
+    const comp = await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: reserva.montoTotalEstimado });
 
-    // Registro del alquiler (entrega/devolucion en esta demo ocurren al finalizar)
-    const ahora = new Date().toISOString();
+    const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.EN_CURSO });
+    return { reserva: actualizada, pago_alquiler: pagoAlquiler, comprobante: comp };
+  }
+
+  // ============ DEVOLVER GARANTIA (Cajero) -> FINALIZADA ============
+  // <<include>> Pagar Garantia: requiere que la garantia haya sido pagada.
+  async devolverGarantia(usuario, reservaId, { metodo, deducciones = 0 } = {}) {
+    this.#exigirCajero(usuario);
+    const reserva = await this.#reservaValidada('devolver_garantia', usuario, reservaId);
+
+    // <<include>> Pagar Garantia: verificar el pago de garantia del cliente
+    const pagos = await reservaRepo.pagosDeReserva(reserva.id);
+    if (!pagos.some((p) => p.concepto === 'GARANTIA')) {
+      throw AppError.conflict('No existe un pago de garantia registrado para esta reserva');
+    }
+
+    const ded = Math.max(Number(deducciones) || 0, 0);
+    const devolucion = Math.max(reserva.garantiaMonto - ded, 0);
+
+    // Registro del alquiler (entrega/devolucion del vehiculo)
     await reservaRepo.crearAlquiler({
       reserva_id: reserva.id,
       vehiculo_id: reserva.vehiculoId,
       fecha_hora_entrega: reserva.fechaInicio,
-      fecha_hora_devolucion: ahora,
+      fecha_hora_devolucion: new Date().toISOString(),
       estado: 'FINALIZADO'
     });
 
-    // Devolucion de garantia (menos deducciones por daños, si las hay)
-    const devolucion = Math.max(reserva.garantiaMonto - ded, 0);
     const pagoDevolucion = await reservaRepo.crearPago({
       reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: metodo || 'TARJETA', estado: 'PAGADO'
     });
-    // <<include>> Emitir Comprobante (de la devolucion de garantia)
-    await comprobante.emitir({ pago_id: pagoDevolucion.id, monto_total: devolucion });
+    // <<include>> Emitir Comprobante
+    const comp = await comprobante.emitir({ pago_id: pagoDevolucion.id, monto_total: devolucion });
 
     const actualizada = await reservaRepo.actualizar(reserva.id, {
       estado: EstadoReserva.FINALIZADA,
@@ -138,7 +154,62 @@ class ReservaService {
       monto_devuelto: devolucion
     });
     await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'DISPONIBLE');
-    return { reserva: actualizada, pago_alquiler: pagoAlquiler, devolucion: pagoDevolucion.monto, deducciones: ded };
+    return { reserva: actualizada, devolucion, deducciones: ded, comprobante: comp };
+  }
+
+  // ============ EMITIR COMPROBANTE (Cajero) ============
+  // <<include>> Pagar Alquiler: emite el comprobante del pago de alquiler.
+  async emitirComprobante(usuario, reservaId) {
+    this.#exigirCajero(usuario);
+    const reserva = await reservaRepo.buscarPorId(reservaId);
+    if (!reserva) throw AppError.notFound('Reserva no encontrada');
+
+    const pagos = await reservaRepo.pagosDeReserva(reservaId);
+    const pagoAlquiler = pagos.find((p) => p.concepto === 'ALQUILER');
+    if (!pagoAlquiler) {
+      throw AppError.conflict('Aun no se ha registrado el pago de alquiler de esta reserva');
+    }
+    const comp = await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: pagoAlquiler.monto });
+    const comprobantes = await reservaRepo.comprobantesDeReserva(reservaId);
+    return { comprobante: comp, comprobantes };
+  }
+
+  async listarComprobantes(usuario, reservaId) {
+    this.#exigirCajero(usuario);
+    return reservaRepo.comprobantesDeReserva(reservaId);
+  }
+
+  // ============ GESTIONAR CANCELACION (Cajero) ============
+  // <<include>> Cancelar Reserva: aplica la regla de 48h y emite comprobante.
+  async gestionarCancelacion(usuario, reservaId, { motivo } = {}) {
+    this.#exigirCajero(usuario);
+    const reserva = await this.#reservaValidada('gestionar_cancelacion', usuario, reservaId);
+
+    const horasRestantes = (new Date(reserva.fechaInicio) - new Date()) / (1000 * 60 * 60);
+    const conPenalidad = horasRestantes < PoliticasAlquiler.HORAS_LIMITE_CANCELACION;
+    const penalidad = conPenalidad
+      ? Number((reserva.garantiaMonto * PoliticasAlquiler.PORCENTAJE_PENALIDAD).toFixed(2))
+      : 0;
+    const devolucion = Math.max(reserva.garantiaMonto - penalidad, 0);
+
+    let comp = null;
+    if (devolucion > 0) {
+      const pagoDev = await reservaRepo.crearPago({
+        reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: 'TARJETA', estado: 'PAGADO'
+      });
+      // <<include>> Emitir Comprobante
+      comp = await comprobante.emitir({ pago_id: pagoDev.id, monto_total: devolucion });
+    }
+
+    const actualizada = await reservaRepo.actualizar(reserva.id, {
+      estado: EstadoReserva.CANCELADA,
+      penalidad,
+      monto_devuelto: devolucion,
+      motivo_cancelacion: motivo || 'Cancelacion gestionada en ventanilla (Cajero)',
+      fecha_cancelacion: new Date().toISOString()
+    });
+    await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'DISPONIBLE');
+    return { reserva: actualizada, penalidad, devolucion, con_penalidad: conPenalidad, comprobante: comp };
   }
 
   // ============ CANCELAR RESERVA (con regla de 48h) ============
@@ -177,6 +248,12 @@ class ReservaService {
       throw AppError.forbidden('Esta accion solo la realiza un Cliente');
     }
     return usuario.clienteId;
+  }
+
+  #exigirCajero(usuario) {
+    if (usuario.rol !== Rol.CAJERO) {
+      throw AppError.forbidden('Esta accion solo la realiza el Cajero');
+    }
   }
 
   #verificarPropiedad(usuario, reserva) {

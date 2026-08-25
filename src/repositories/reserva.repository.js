@@ -83,6 +83,23 @@ class ReservaRepository {
   async crearComprobante(datos) {
     return unwrap(await supabase.from('comprobante').insert(datos).select().single());
   }
+
+  /** Pagos de una reserva (garantia, alquiler, devolucion). */
+  async pagosDeReserva(reservaId) {
+    return unwrap(
+      await supabase.from('pago').select('*').eq('reserva_id', reservaId)
+    );
+  }
+
+  /** Comprobantes de una reserva (via sus pagos). */
+  async comprobantesDeReserva(reservaId) {
+    const pagos = await this.pagosDeReserva(reservaId);
+    const ids = pagos.map((p) => p.id);
+    if (ids.length === 0) return [];
+    return unwrap(
+      await supabase.from('comprobante').select('*').in('pago_id', ids)
+    );
+  }
 }
 
 module.exports = new ReservaRepository();

@@ -24,4 +24,10 @@ router.get('/reservas/:reservaId', c.verReserva);
 router.patch('/reservas/:reservaId/pagar-alquiler', exigirRol(Rol.CLIENTE, Rol.CAJERO), c.pagarAlquiler);
 router.patch('/reservas/:reservaId/cancelar', exigirRol(Rol.CLIENTE, Rol.CAJERO), c.cancelar);
 
+// ---- Cajero (ventanilla) ----
+router.patch('/reservas/:reservaId/devolver-garantia', exigirRol(Rol.CAJERO), c.devolverGarantia);      // <<include>> Pagar Garantia
+router.patch('/reservas/:reservaId/gestionar-cancelacion', exigirRol(Rol.CAJERO), c.gestionarCancelacion); // <<include>> Cancelar Reserva
+router.post('/reservas/:reservaId/emitir-comprobante', exigirRol(Rol.CAJERO), c.emitirComprobante);     // <<include>> Pagar Alquiler
+router.get('/reservas/:reservaId/comprobantes', exigirRol(Rol.CAJERO), c.listarComprobantes);
+
 module.exports = router;

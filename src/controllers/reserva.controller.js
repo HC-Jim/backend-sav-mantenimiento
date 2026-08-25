@@ -42,11 +42,28 @@ class ReservaController {
   });
 
   pagarAlquiler = asyncHandler(async (req, res) => {
-    res.json(await svc.pagarAlquilerYDevolver(req.user, req.params.reservaId, req.body));
+    res.json(await svc.pagarAlquiler(req.user, req.params.reservaId, req.body));
   });
 
   cancelar = asyncHandler(async (req, res) => {
     res.json(await svc.cancelarReserva(req.user, req.params.reservaId, req.body));
+  });
+
+  // ----- Acciones del Cajero -----
+  devolverGarantia = asyncHandler(async (req, res) => {
+    res.json(await svc.devolverGarantia(req.user, req.params.reservaId, req.body));
+  });
+
+  gestionarCancelacion = asyncHandler(async (req, res) => {
+    res.json(await svc.gestionarCancelacion(req.user, req.params.reservaId, req.body));
+  });
+
+  emitirComprobante = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.emitirComprobante(req.user, req.params.reservaId));
+  });
+
+  listarComprobantes = asyncHandler(async (req, res) => {
+    res.json(await svc.listarComprobantes(req.user, req.params.reservaId));
   });
 }
 
