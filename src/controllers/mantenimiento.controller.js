@@ -16,6 +16,10 @@ class MantenimientoController {
     res.json(await svc.catalogoRepuestos());
   });
 
+  comprarRepuesto = asyncHandler(async (req, res) => {
+    res.json(await svc.comprarRepuesto(req.user, req.params.repuestoId, req.body.cantidad));
+  });
+
   listarMecanicos = asyncHandler(async (_req, res) => {
     res.json(await svc.listarMecanicos());
   });

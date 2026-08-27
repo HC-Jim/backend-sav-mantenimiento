@@ -25,6 +25,18 @@ class MantenimientoService {
     return repuestoRepo.listar();
   }
 
+  // Comprar mas stock de un repuesto del catalogo (Jefe de Logistica).
+  async comprarRepuesto(usuario, repuestoId, cantidad) {
+    if (usuario.rol !== Rol.JEFE_LOGISTICA) {
+      throw AppError.forbidden('Solo el Jefe de Logistica puede comprar repuestos');
+    }
+    const n = Math.trunc(Number(cantidad) || 0);
+    if (n <= 0) throw AppError.badRequest('La cantidad a comprar debe ser mayor a 0');
+    const repuesto = await repuestoRepo.buscarPorId(repuestoId);
+    if (!repuesto) throw AppError.notFound('Repuesto no encontrado');
+    return repuestoRepo.ajustarStock(repuestoId, Number(repuesto.stock) + n);
+  }
+
   async listarMecanicos() {
     return usuarioRepo.listarPorRol(Rol.MECANICO);
   }
