@@ -120,6 +120,10 @@ class MantenimientoService {
     if (!presupuesto) throw AppError.notFound('Presupuesto no encontrado');
     const orden = await this.#ordenValidada('decidir_presupuesto', presupuesto.ordenId, usuario);
 
+    // <<include>> Generar Documentos de Costos: el Jefe evalua el costo
+    // consolidado (repuestos + mano de obra + total) antes de decidir.
+    const documentosCostos = await documentosCosto.generarParaOrden(orden.id);
+
     const presActualizado = await ordenRepo.actualizarPresupuesto(presupuestoId, {
       estado: autorizado ? 'AUTORIZADO' : 'RECHAZADO',
       motivo_rechazo: autorizado ? null : motivo || null
@@ -135,7 +139,8 @@ class MantenimientoService {
       });
       await vehiculoRepo.actualizarEstado(orden.vehiculoId, 'DISPONIBLE');
     }
-    return presActualizado;
+    // Devuelve la decision junto con los documentos de costos evaluados.
+    return { presupuesto: presActualizado, documentos_costos: documentosCostos };
   }
 
   // ============ 7. INICIAR MANTENIMIENTO (Mecanico) ============
