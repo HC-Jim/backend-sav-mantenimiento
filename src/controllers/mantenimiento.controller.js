@@ -46,8 +46,8 @@ class MantenimientoController {
     res.status(201).json(await svc.crearOrden(req.user, req.body));
   });
 
-  comprarRepuestos = asyncHandler(async (req, res) => {
-    res.json(await svc.comprarRepuestos(req.user, req.params.requerimientoId));
+  aprobarRequerimiento = asyncHandler(async (req, res) => {
+    res.json(await svc.aprobarRequerimiento(req.user, req.params.requerimientoId));
   });
 
   decidirPresupuesto = asyncHandler(async (req, res) => {

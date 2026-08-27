@@ -100,26 +100,34 @@ class MantenimientoService {
   }
 
   // ============ 4. GESTIONA Y COMPRA (Jefe) -> descuenta stock ============
-  async comprarRepuestos(usuario, requerimientoId) {
+  // El Jefe aprueba el requerimiento solicitado por el Mecanico. Al aprobar
+  // se descuenta el stock de los repuestos del almacen.
+  async aprobarRequerimiento(usuario, requerimientoId) {
     const req = await ordenRepo.buscarRequerimiento(requerimientoId);
     if (!req) throw AppError.notFound('Requerimiento no encontrado');
     await this.#ordenValidada('comprar_repuestos', req.orden_id, usuario);
-    if (req.estado === 'COMPRADO') {
-      throw AppError.conflict('El requerimiento ya fue comprado');
+    if (req.estado === 'APROBADO') {
+      throw AppError.conflict('El requerimiento ya fue aprobado');
     }
     await this.#descontarStock(req.repuesto_item || []);
-    return ordenRepo.marcarRequerimientoComprado(requerimientoId);
+    return ordenRepo.marcarRequerimientoAprobado(requerimientoId);
   }
 
   // ============ 5. GENERAR PRESUPUESTO (Mecanico) ============
   async generarPresupuesto(usuario, ordenId, datos) {
     await this.#ordenValidada('generar_presupuesto', ordenId, usuario);
 
-    const detalle = Array.isArray(datos.detalle) ? datos.detalle : [];
-    const filasDetalle = await Promise.all(detalle.map((d) => this.#normalizarDetalle(d)));
-    const costoRepuestos = filasDetalle.length
-      ? filasDetalle.reduce((acc, f) => acc + f.cantidad * f.precio_unitario, 0)
-      : Number(datos.costo_repuestos || 0);
+    // El detalle de repuestos proviene del requerimiento YA APROBADO (con su
+    // cantidad aprobada); el Mecanico solo aporta el costo de mano de obra.
+    const reqAprobado = await ordenRepo.requerimientoAprobadoDeOrden(ordenId);
+    const items = (reqAprobado && reqAprobado.repuesto_item) || [];
+    const filasDetalle = items.map((it) => ({
+      repuesto_id: it.repuesto_id || null,
+      descripcion: it.nombre || 'Item',
+      cantidad: it.cantidad || 1,
+      precio_unitario: Number(it.precio_unitario || 0)
+    }));
+    const costoRepuestos = filasDetalle.reduce((acc, f) => acc + f.cantidad * f.precio_unitario, 0);
 
     const presupuesto = await ordenRepo.crearPresupuesto(ordenId, {
       costo_repuestos: costoRepuestos,

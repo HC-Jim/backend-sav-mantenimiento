@@ -116,14 +116,28 @@ class OrdenRepository {
     );
   }
 
-  async marcarRequerimientoComprado(id) {
+  async marcarRequerimientoAprobado(id) {
     return unwrap(
       await supabase
         .from('requerimiento_repuesto')
-        .update({ estado: 'COMPRADO' })
+        .update({ estado: 'APROBADO' })
         .eq('id', id)
         .select()
         .single()
+    );
+  }
+
+  /** Requerimiento APROBADO de una orden (con sus items), si existe. */
+  async requerimientoAprobadoDeOrden(ordenId) {
+    return unwrap(
+      await supabase
+        .from('requerimiento_repuesto')
+        .select('*, repuesto_item (*)')
+        .eq('orden_id', ordenId)
+        .eq('estado', 'APROBADO')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle()
     );
   }
 

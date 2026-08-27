@@ -19,7 +19,7 @@ router.get('/mecanicos', exigirRol(Rol.JEFE_LOGISTICA), c.listarMecanicos); // p
 
 // ---- JEFE DE LOGISTICA ----
 router.post('/ordenes', exigirRol(Rol.JEFE_LOGISTICA), c.crearOrden);
-router.patch('/requerimientos/:requerimientoId/comprar', exigirRol(Rol.JEFE_LOGISTICA), c.comprarRepuestos);
+router.patch('/requerimientos/:requerimientoId/aprobar', exigirRol(Rol.JEFE_LOGISTICA), c.aprobarRequerimiento);
 router.patch('/presupuestos/:presupuestoId/decidir', exigirRol(Rol.JEFE_LOGISTICA), c.decidirPresupuesto);
 router.patch('/ordenes/:ordenId/conformidad', exigirRol(Rol.JEFE_LOGISTICA), c.decidirConformidad);
 
