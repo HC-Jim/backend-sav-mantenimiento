@@ -135,7 +135,7 @@ class MantenimientoService {
     });
     const detalleGuardado = await ordenRepo.agregarDetallePresupuesto(presupuesto.id, filasDetalle);
     await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });
-    return { ...presupuesto.toJSON(), detalle_presupuesto: detalleGuardado };
+    return { ...presupuesto, detalle_presupuesto: detalleGuardado };
   }
 
   // ============ 6. AUTORIZAR / RECHAZAR PRESUPUESTO (Jefe) ============
