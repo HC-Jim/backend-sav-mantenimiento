@@ -53,6 +53,10 @@ class MantenimientoService {
     if (vehiculo.estado === 'EN_MANTENIMIENTO') {
       throw AppError.conflict('El vehiculo ya tiene una orden de mantenimiento en curso');
     }
+    // No se puede mantener un vehiculo que un cliente tiene reservado/en uso.
+    if (vehiculo.estado === 'ALQUILADO') {
+      throw AppError.conflict('El vehiculo esta alquilado a un cliente; no se puede crear una orden de mantenimiento hasta su devolucion');
+    }
 
     const orden = await ordenRepo.crear({
       vehiculo_id: datos.vehiculo_id,
