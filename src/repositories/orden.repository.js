@@ -35,6 +35,7 @@ class OrdenRepository {
           vehiculo:vehiculo_id (*),
           inspeccion (*),
           requerimiento_repuesto ( *, repuesto_item (*) ),
+          mano_obra (*),
           presupuesto ( *, detalle_presupuesto (*) ),
           informe_tecnico (*),
           acta_entrega (*)`)
@@ -124,6 +125,43 @@ class OrdenRepository {
         .eq('id', id)
         .select()
         .single()
+    );
+  }
+
+  // ---------- MANO DE OBRA ----------
+  async crearManoObra(ordenId, { costo, observacion }) {
+    return unwrap(
+      await supabase
+        .from('mano_obra')
+        .insert({ orden_id: ordenId, costo: costo || 0, observacion: observacion || null, estado: 'SOLICITADO' })
+        .select()
+        .single()
+    );
+  }
+
+  async buscarManoObra(id) {
+    return unwrap(
+      await supabase.from('mano_obra').select('*').eq('id', id).maybeSingle()
+    );
+  }
+
+  async marcarManoObraAprobada(id) {
+    return unwrap(
+      await supabase.from('mano_obra').update({ estado: 'APROBADO' }).eq('id', id).select().single()
+    );
+  }
+
+  /** Mano de obra APROBADA de una orden, si existe. */
+  async manoObraAprobadaDeOrden(ordenId) {
+    return unwrap(
+      await supabase
+        .from('mano_obra')
+        .select('*')
+        .eq('orden_id', ordenId)
+        .eq('estado', 'APROBADO')
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle()
     );
   }
 

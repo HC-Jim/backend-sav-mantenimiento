@@ -113,12 +113,38 @@ class MantenimientoService {
     return ordenRepo.marcarRequerimientoAprobado(requerimientoId);
   }
 
+  // El Mecanico registra el costo de mano de obra (+ observacion) como paso
+  // aparte; queda SOLICITADO hasta que el Jefe lo apruebe.
+  async registrarManoObra(usuario, ordenId, { costo, observacion } = {}) {
+    await this.#ordenValidada('registrar_mano_obra', ordenId, usuario);
+    const orden = await ordenRepo.buscarPorId(ordenId);
+    if ((orden.manosObra || []).length > 0) {
+      throw AppError.conflict('Ya se registro la mano de obra de esta orden');
+    }
+    return ordenRepo.crearManoObra(ordenId, { costo: Number(costo || 0), observacion });
+  }
+
+  // El Jefe aprueba la mano de obra registrada por el Mecanico.
+  async aprobarManoObra(usuario, manoObraId) {
+    const mo = await ordenRepo.buscarManoObra(manoObraId);
+    if (!mo) throw AppError.notFound('Mano de obra no encontrada');
+    await this.#ordenValidada('aprobar_mano_obra', mo.orden_id, usuario);
+    if (mo.estado === 'APROBADO') throw AppError.conflict('La mano de obra ya fue aprobada');
+    return ordenRepo.marcarManoObraAprobada(manoObraId);
+  }
+
   // ============ 5. GENERAR PRESUPUESTO (Mecanico) ============
-  async generarPresupuesto(usuario, ordenId, datos) {
+  async generarPresupuesto(usuario, ordenId, _datos) {
     await this.#ordenValidada('generar_presupuesto', ordenId, usuario);
 
+    // La mano de obra debe estar aprobada (paso aparte).
+    const manoObra = await ordenRepo.manoObraAprobadaDeOrden(ordenId);
+    if (!manoObra) {
+      throw AppError.conflict('La mano de obra debe estar aprobada antes de generar el presupuesto');
+    }
+
     // El detalle de repuestos proviene del requerimiento YA APROBADO (con su
-    // cantidad aprobada); el Mecanico solo aporta el costo de mano de obra.
+    // cantidad aprobada). El costo de mano de obra viene de la mano de obra aprobada.
     const reqAprobado = await ordenRepo.requerimientoAprobadoDeOrden(ordenId);
     const items = (reqAprobado && reqAprobado.repuesto_item) || [];
     const filasDetalle = items.map((it) => ({
@@ -131,7 +157,7 @@ class MantenimientoService {
 
     const presupuesto = await ordenRepo.crearPresupuesto(ordenId, {
       costo_repuestos: costoRepuestos,
-      costo_mano_obra: Number(datos.costo_mano_obra || 0)
+      costo_mano_obra: Number(manoObra.costo || 0)
     });
     const detalleGuardado = await ordenRepo.agregarDetallePresupuesto(presupuesto.id, filasDetalle);
     await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });

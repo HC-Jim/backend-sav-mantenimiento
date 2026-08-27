@@ -241,6 +241,15 @@ create table repuesto_item (
   no_catalogado    boolean default false
 );
 
+create table mano_obra (
+  id          bigint generated always as identity primary key,
+  orden_id    bigint not null references orden_mantenimiento(id) on delete cascade,
+  costo       numeric(10,2) not null default 0,
+  observacion text,
+  estado      varchar(20) default 'SOLICITADO',  -- SOLICITADO | APROBADO
+  creado_en   timestamptz default now()
+);
+
 create table presupuesto (
   id              bigint generated always as identity primary key,
   orden_id        bigint not null references orden_mantenimiento(id) on delete cascade,

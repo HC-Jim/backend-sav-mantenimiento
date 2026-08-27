@@ -76,6 +76,14 @@ class MantenimientoController {
     res.status(201).json(await svc.crearRequerimiento(req.user, req.params.ordenId, items));
   });
 
+  registrarManoObra = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.registrarManoObra(req.user, req.params.ordenId, req.body));
+  });
+
+  aprobarManoObra = asyncHandler(async (req, res) => {
+    res.json(await svc.aprobarManoObra(req.user, req.params.manoObraId));
+  });
+
   generarPresupuesto = asyncHandler(async (req, res) => {
     res.status(201).json(await svc.generarPresupuesto(req.user, req.params.ordenId, req.body));
   });

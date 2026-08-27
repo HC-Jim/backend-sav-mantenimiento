@@ -22,6 +22,7 @@ class OrdenMantenimiento {
     this.vehiculo = row.vehiculo || null;
     this.inspecciones = row.inspeccion || [];
     this.requerimientos = row.requerimiento_repuesto || [];
+    this.manosObra = row.mano_obra || [];
     this.presupuestos = row.presupuesto || [];
     this.informes = row.informe_tecnico || [];
     this.actaEntrega = row.acta_entrega || null;
@@ -63,6 +64,7 @@ class OrdenMantenimiento {
       vehiculo: this.vehiculo,
       inspeccion: this.inspecciones,
       requerimiento_repuesto: this.requerimientos,
+      mano_obra: this.manosObra,
       presupuesto: this.presupuestos,
       informe_tecnico: this.informes,
       acta_entrega: this.actaEntrega
