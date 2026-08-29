@@ -7,6 +7,7 @@
  *  CONFIRMADA/EN_CURSO --(cancelar / gestionar cancelacion)--> CANCELADA
  */
 const EstadoReserva = Object.freeze({
+  PENDIENTE_APROBACION: 'PENDIENTE_APROBACION', // orden de reserva generada, pendiente de aprobacion del Cajero
   PENDIENTE_PAGO_GARANTIA: 'PENDIENTE_PAGO_GARANTIA',
   CONFIRMADA: 'CONFIRMADA',
   EN_CURSO: 'EN_CURSO',
@@ -17,11 +18,13 @@ const EstadoReserva = Object.freeze({
 const FINALES = [EstadoReserva.FINALIZADA, EstadoReserva.CANCELADA];
 
 const ACCIONES = Object.freeze({
+  // El Cajero acepta la orden de reserva y emite el comprobante.
+  aprobar_reserva:       { desde: [EstadoReserva.PENDIENTE_APROBACION], hacia: EstadoReserva.CONFIRMADA },
   pagar_garantia:        { desde: [EstadoReserva.PENDIENTE_PAGO_GARANTIA], hacia: EstadoReserva.CONFIRMADA },
   pagar_alquiler:        { desde: [EstadoReserva.CONFIRMADA], hacia: EstadoReserva.EN_CURSO },
   devolver_garantia:     { desde: [EstadoReserva.EN_CURSO], hacia: EstadoReserva.FINALIZADA },
-  cancelar:              { desde: [EstadoReserva.CONFIRMADA], hacia: EstadoReserva.CANCELADA },
-  gestionar_cancelacion: { desde: [EstadoReserva.CONFIRMADA, EstadoReserva.EN_CURSO], hacia: EstadoReserva.CANCELADA }
+  cancelar:              { desde: [EstadoReserva.PENDIENTE_APROBACION, EstadoReserva.CONFIRMADA], hacia: EstadoReserva.CANCELADA },
+  gestionar_cancelacion: { desde: [EstadoReserva.PENDIENTE_APROBACION, EstadoReserva.CONFIRMADA, EstadoReserva.EN_CURSO], hacia: EstadoReserva.CANCELADA }
 });
 
 class MaquinaReserva {

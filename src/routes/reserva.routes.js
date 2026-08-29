@@ -25,6 +25,8 @@ router.patch('/reservas/:reservaId/pagar-alquiler', exigirRol(Rol.CLIENTE, Rol.C
 router.patch('/reservas/:reservaId/cancelar', exigirRol(Rol.CLIENTE, Rol.CAJERO), c.cancelar);
 
 // ---- Cajero (ventanilla) ----
+router.patch('/reservas/:reservaId/aprobar', exigirRol(Rol.CAJERO), c.aprobarReserva);                  // acepta la orden de reserva + comprobante
+router.patch('/reservas/:reservaId/cobrar-extra', exigirRol(Rol.CAJERO), c.cobrarDiasExtra);            // dias extra x precio/dia + comprobante
 router.patch('/reservas/:reservaId/devolver-garantia', exigirRol(Rol.CAJERO), c.devolverGarantia);      // <<include>> Pagar Garantia
 router.patch('/reservas/:reservaId/gestionar-cancelacion', exigirRol(Rol.CAJERO), c.gestionarCancelacion); // <<include>> Cancelar Reserva
 router.post('/reservas/:reservaId/emitir-comprobante', exigirRol(Rol.CAJERO), c.emitirComprobante);     // <<include>> Pagar Alquiler

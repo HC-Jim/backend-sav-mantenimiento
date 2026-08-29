@@ -18,6 +18,10 @@ class CotizacionController {
     res.json(await svc.decidir(req.user, req.params.id, aceptar));
   });
   pagarGarantia = asyncHandler(async (req, res) => res.json(await svc.pagarGarantia(req.user, req.params.id, req.body)));
+
+  // Cajero
+  garantiasPendientes = asyncHandler(async (_req, res) => res.json(await svc.listarGarantiasPendientes()));
+  aprobarGarantia = asyncHandler(async (req, res) => res.json(await svc.aprobarGarantia(req.user, req.params.id)));
 }
 
 module.exports = new CotizacionController();

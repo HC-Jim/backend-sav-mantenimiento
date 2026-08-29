@@ -8,6 +8,7 @@ class Reserva {
     this.id = row.id;
     this.clienteId = row.cliente_id;
     this.vehiculoId = row.vehiculo_id;
+    this.cotizacionId = row.cotizacion_id;
     this.fechaSolicitud = row.fecha_solicitud;
     this.fechaInicio = row.fecha_inicio;
     this.fechaFin = row.fecha_fin;
@@ -38,6 +39,7 @@ class Reserva {
       id: this.id,
       cliente_id: this.clienteId,
       vehiculo_id: this.vehiculoId,
+      cotizacion_id: this.cotizacionId,
       fecha_solicitud: this.fechaSolicitud,
       fecha_inicio: this.fechaInicio,
       fecha_fin: this.fechaFin,

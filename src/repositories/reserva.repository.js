@@ -91,6 +91,13 @@ class ReservaRepository {
     );
   }
 
+  /** Pagos asociados a una cotizacion (garantia). */
+  async pagosDeCotizacion(cotizacionId) {
+    return unwrap(
+      await supabase.from('pago').select('*').eq('cotizacion_id', cotizacionId)
+    );
+  }
+
   /** Comprobantes de una reserva (via sus pagos). */
   async comprobantesDeReserva(reservaId) {
     const pagos = await this.pagosDeReserva(reservaId);

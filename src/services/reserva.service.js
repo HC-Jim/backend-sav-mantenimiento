@@ -98,6 +98,48 @@ class ReservaService {
     return { reserva: actualizada, pago, comprobante: comp };
   }
 
+  // ============ APROBAR RESERVA (Cajero) -> CONFIRMADA ============
+  // El Cajero acepta la orden de reserva y emite el comprobante que demuestra
+  // el pago de la garantia. Recien ahi el vehiculo queda ALQUILADO.
+  async aprobarReserva(usuario, reservaId) {
+    this.#exigirCajero(usuario);
+    const reserva = await this.#reservaValidada('aprobar_reserva', usuario, reservaId);
+
+    let comp = null;
+    if (reserva.cotizacionId) {
+      const pagos = await reservaRepo.pagosDeCotizacion(reserva.cotizacionId);
+      const pagoGarantia = pagos.find((p) => p.concepto === 'GARANTIA');
+      if (pagoGarantia) {
+        // <<include>> Emitir Comprobante (reserva)
+        comp = await comprobante.emitir({ pago_id: pagoGarantia.id, monto_total: reserva.montoTotalEstimado });
+      }
+    }
+    const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.CONFIRMADA });
+    await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'ALQUILADO');
+    return { reserva: actualizada, comprobante: comp };
+  }
+
+  // ============ COBRAR DIAS EXTRA (Cajero) ============
+  // Cargo por retraso: dias extra x precio por dia (segun la tarifa pactada) + comprobante.
+  async cobrarDiasExtra(usuario, reservaId, { dias } = {}) {
+    this.#exigirCajero(usuario);
+    const reserva = await reservaRepo.buscarPorId(reservaId);
+    if (!reserva) throw AppError.notFound('Reserva no encontrada');
+    const n = Math.trunc(Number(dias) || 0);
+    if (n <= 0) throw AppError.badRequest('Los dias extra deben ser mayor a 0');
+
+    const diasPactados = Math.max(PoliticasAlquiler.diasEntre(reserva.fechaInicio, reserva.fechaFin), 1);
+    const tarifaDia = reserva.montoTotalEstimado / diasPactados;
+    const monto = Number((tarifaDia * n).toFixed(2));
+
+    const pago = await reservaRepo.crearPago({
+      reserva_id: reserva.id, monto, concepto: 'EXTRA', metodo: 'TARJETA', estado: 'PAGADO'
+    });
+    // <<include>> Emitir Comprobante (dias extra)
+    const comp = await comprobante.emitir({ pago_id: pago.id, monto_total: monto });
+    return { dias: n, tarifa_dia: Number(tarifaDia.toFixed(2)), monto, comprobante: comp };
+  }
+
   // ============ PAGAR ALQUILER (Cliente/Cajero) -> EN_CURSO ============
   // Registra el pago del alquiler y entrega el vehiculo. La garantia queda
   // retenida; el Cajero la devuelve luego con "Devolver Garantia".

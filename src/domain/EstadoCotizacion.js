@@ -11,7 +11,8 @@ const EstadoCotizacion = Object.freeze({
   ACEPTADA: 'ACEPTADA',
   RECHAZADA: 'RECHAZADA',
   GARANTIA_SOLICITADA: 'GARANTIA_SOLICITADA',
-  GARANTIA_PAGADA: 'GARANTIA_PAGADA',
+  GARANTIA_PAGADA: 'GARANTIA_PAGADA',        // cliente pago, pendiente de aprobacion del Cajero
+  GARANTIA_APROBADA: 'GARANTIA_APROBADA',    // Cajero aprobo y emitio comprobante
   CONVERTIDA: 'CONVERTIDA'
 });
 
@@ -21,8 +22,12 @@ const ACCIONES = Object.freeze({
   aceptar:            { desde: [EstadoCotizacion.PENDIENTE], hacia: EstadoCotizacion.ACEPTADA },
   rechazar:           { desde: [EstadoCotizacion.PENDIENTE], hacia: EstadoCotizacion.RECHAZADA },
   solicitar_garantia: { desde: [EstadoCotizacion.ACEPTADA], hacia: EstadoCotizacion.GARANTIA_SOLICITADA },
-  pagar_garantia:     { desde: [EstadoCotizacion.GARANTIA_SOLICITADA], hacia: EstadoCotizacion.GARANTIA_PAGADA },
-  generar_reserva:    { desde: [EstadoCotizacion.GARANTIA_PAGADA], hacia: EstadoCotizacion.CONVERTIDA }
+  // El cliente puede pagar tras aceptar (self-service) o tras solicitud del asesor.
+  pagar_garantia:     { desde: [EstadoCotizacion.ACEPTADA, EstadoCotizacion.GARANTIA_SOLICITADA], hacia: EstadoCotizacion.GARANTIA_PAGADA },
+  // El Cajero aprueba la garantia pagada y emite su comprobante.
+  aprobar_garantia:   { desde: [EstadoCotizacion.GARANTIA_PAGADA], hacia: EstadoCotizacion.GARANTIA_APROBADA },
+  // Genera la Orden de Reserva (asesor o cliente), tras aprobar la garantia.
+  generar_reserva:    { desde: [EstadoCotizacion.GARANTIA_APROBADA], hacia: EstadoCotizacion.CONVERTIDA }
 });
 
 class MaquinaCotizacion {

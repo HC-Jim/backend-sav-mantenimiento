@@ -17,7 +17,16 @@ const AppError = require('../utils/AppError');
 class CotizacionService {
   // ============ ASESOR: Generar Cotizacion ============
   async generarCotizacion(usuario, { cliente_id, vehiculo_id, fecha_inicio, fecha_fin }) {
-    this.#exigirAsesor(usuario);
+    // El Asesor cotiza a un cliente; el Cliente puede autogenerar su cotizacion.
+    let asesorId = null;
+    if (usuario.rol === Rol.CLIENTE) {
+      if (!usuario.clienteId) throw AppError.forbidden('Tu usuario no tiene un cliente asociado');
+      cliente_id = usuario.clienteId;
+    } else if (usuario.rol === Rol.ASESOR_VENTAS) {
+      asesorId = usuario.id;
+    } else {
+      throw AppError.forbidden('Solo el Asesor de Ventas o el Cliente pueden generar una cotizacion');
+    }
     if (!cliente_id || !vehiculo_id) throw AppError.badRequest('cliente_id y vehiculo_id son obligatorios');
     if (!fecha_inicio || !fecha_fin) throw AppError.badRequest('fecha_inicio y fecha_fin son obligatorias');
 
@@ -37,7 +46,7 @@ class CotizacionService {
     return cotizacionRepo.crear({
       cliente_id,
       vehiculo_id,
-      asesor_id: usuario.id,
+      asesor_id: asesorId,
       fecha_inicio,
       fecha_fin,
       dias,
@@ -82,32 +91,59 @@ class CotizacionService {
     const { ok, motivo, hacia } = MaquinaCotizacion.validar('pagar_garantia', cot.estado);
     if (!ok) throw AppError.conflict(motivo);
 
-    const pago = await reservaRepo.crearPago({
+    // Se registra el pago; el comprobante lo emite el Cajero al aprobar.
+    await reservaRepo.crearPago({
       cotizacion_id: cot.id, monto: cot.garantiaMonto, concepto: 'GARANTIA',
       metodo: metodo || 'TARJETA', estado: 'PAGADO'
     });
-    await comprobante.emitir({ pago_id: pago.id, monto_total: cot.garantiaMonto }); // <<include>>
     return cotizacionRepo.actualizar(cotizacionId, { estado: hacia });
+  }
+
+  // ============ CAJERO: Aprobar Garantia (+ comprobante) ============
+  async aprobarGarantia(usuario, cotizacionId) {
+    this.#exigirCajero(usuario);
+    const cot = await this.#cotizacion(cotizacionId);
+    const { ok, motivo, hacia } = MaquinaCotizacion.validar('aprobar_garantia', cot.estado);
+    if (!ok) throw AppError.conflict(motivo);
+
+    const pagos = await reservaRepo.pagosDeCotizacion(cot.id);
+    const pagoGarantia = pagos.find((p) => p.concepto === 'GARANTIA');
+    if (!pagoGarantia) throw AppError.conflict('No hay un pago de garantia registrado');
+    // <<include>> Emitir Comprobante (garantia)
+    await comprobante.emitir({ pago_id: pagoGarantia.id, monto_total: cot.garantiaMonto });
+    return cotizacionRepo.actualizar(cotizacionId, { estado: hacia });
+  }
+
+  async listarGarantiasPendientes() {
+    const todas = await cotizacionRepo.listarTodas();
+    return todas.filter((c) => c.estado === EstadoCotizacion.GARANTIA_PAGADA);
   }
 
   // ============ ASESOR: Generar Orden de Reserva ============
   async generarOrdenReserva(usuario, cotizacionId) {
-    this.#exigirAsesor(usuario);
     const cot = await this.#cotizacion(cotizacionId);
+    // La genera el Asesor (cualquier cotizacion) o el propio Cliente (la suya).
+    if (usuario.rol === Rol.CLIENTE) {
+      if (cot.clienteId !== usuario.clienteId) {
+        throw AppError.forbidden('No puedes operar una cotizacion de otro cliente');
+      }
+    } else if (usuario.rol !== Rol.ASESOR_VENTAS) {
+      throw AppError.forbidden('Esta accion la realiza el Asesor de Ventas o el Cliente');
+    }
     const { ok, motivo } = MaquinaCotizacion.validar('generar_reserva', cot.estado);
     if (!ok) throw AppError.conflict(motivo);
 
+    // La reserva queda PENDIENTE_APROBACION hasta que el Cajero la acepte.
     const reserva = await reservaRepo.crear({
       cliente_id: cot.clienteId,
       vehiculo_id: cot.vehiculoId,
       cotizacion_id: cot.id,
       fecha_inicio: cot.fechaInicio,
       fecha_fin: cot.fechaFin,
-      estado: EstadoReserva.CONFIRMADA,
+      estado: EstadoReserva.PENDIENTE_APROBACION,
       monto_total_estimado: cot.montoTotalEstimado,
       garantia_monto: cot.garantiaMonto
     });
-    await vehiculoRepo.actualizarEstado(cot.vehiculoId, 'ALQUILADO');
     await cotizacionRepo.actualizar(cotizacionId, { estado: EstadoCotizacion.CONVERTIDA });
     return reserva;
   }
@@ -116,6 +152,12 @@ class CotizacionService {
   #exigirAsesor(usuario) {
     if (usuario.rol !== Rol.ASESOR_VENTAS) {
       throw AppError.forbidden('Esta accion la realiza el Asesor de Ventas');
+    }
+  }
+
+  #exigirCajero(usuario) {
+    if (usuario.rol !== Rol.CAJERO) {
+      throw AppError.forbidden('Esta accion la realiza el Cajero');
     }
   }
 
