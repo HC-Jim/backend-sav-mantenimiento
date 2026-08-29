@@ -93,7 +93,7 @@ class MantenimientoController {
   });
 
   finalizarMantenimiento = asyncHandler(async (req, res) => {
-    res.json(await svc.finalizarMantenimiento(req.user, req.params.ordenId));
+    res.json(await svc.finalizarMantenimiento(req.user, req.params.ordenId, req.body));
   });
 
   generarInforme = asyncHandler(async (req, res) => {

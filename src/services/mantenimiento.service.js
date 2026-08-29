@@ -203,9 +203,12 @@ class MantenimientoService {
   }
 
   // ============ 8. FINALIZAR MANTENIMIENTO (Mecanico) ============
-  async finalizarMantenimiento(usuario, ordenId) {
+  async finalizarMantenimiento(usuario, ordenId, { observacion } = {}) {
     await this.#ordenValidada('finalizar_mantenimiento', ordenId, usuario);
-    return ordenRepo.actualizar(ordenId, { hora_fin_mant: new Date().toISOString() });
+    return ordenRepo.actualizar(ordenId, {
+      hora_fin_mant: new Date().toISOString(),
+      observacion_ejecucion: observacion || null
+    });
   }
 
   // ============ 9. GENERAR INFORME TECNICO (Mecanico) ============

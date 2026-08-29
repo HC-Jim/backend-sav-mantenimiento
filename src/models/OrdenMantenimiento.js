@@ -15,6 +15,7 @@ class OrdenMantenimiento {
     this.estado = row.estado;
     this.horaInicioMant = row.hora_inicio_mant;
     this.horaFinMant = row.hora_fin_mant;
+    this.observacionEjecucion = row.observacion_ejecucion;
     this.fechaCreacion = row.fecha_creacion;
     this.fechaCierre = row.fecha_cierre;
 
@@ -58,6 +59,7 @@ class OrdenMantenimiento {
       estado: this.estado,
       hora_inicio_mant: this.horaInicioMant,
       hora_fin_mant: this.horaFinMant,
+      observacion_ejecucion: this.observacionEjecucion,
       duracion_minutos: this.duracionMinutos(),
       fecha_creacion: this.fechaCreacion,
       fecha_cierre: this.fechaCierre,

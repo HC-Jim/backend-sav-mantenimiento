@@ -204,6 +204,7 @@ create table orden_mantenimiento (
   estado         varchar(35) not null default 'PENDIENTE_INSPECCION',
   hora_inicio_mant timestamptz,
   hora_fin_mant    timestamptz,
+  observacion_ejecucion text,
   fecha_creacion timestamptz default now(),
   fecha_cierre   timestamptz
 );
