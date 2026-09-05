@@ -64,6 +64,11 @@ class MantenimientoController {
     res.status(201).json(await svc.registrarInspeccion(req.user, req.params.ordenId, req.body));
   });
 
+  // Inspeccion + requerimiento + mano de obra + presupuesto en un solo paso.
+  procesarInspeccion = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.procesarInspeccion(req.user, req.params.ordenId, req.body));
+  });
+
   crearRequerimiento = asyncHandler(async (req, res) => {
     const { items } = req.body;
     if (!Array.isArray(items) || items.length === 0) {

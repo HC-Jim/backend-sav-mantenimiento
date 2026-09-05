@@ -134,6 +134,69 @@ class MantenimientoService {
     return presupuesto;
   }
 
+  // ============ 2b. INSPECCION COMPLETA EN UN SOLO PASO (Mecanico) ============
+  // El Mecanico registra, en un unico formulario, la inspeccion + (si aplica)
+  // el requerimiento de repuestos + la mano de obra y genera el presupuesto.
+  // Reglas:
+  //  - SIN_HALLAZGOS -> se cierra la orden (no hay nada que reparar).
+  //  - POSTERGADA    -> solo se registra la inspeccion (se retomara luego).
+  //  - CON_HALLAZGOS -> mano de obra obligatoria; requerimiento solo si la
+  //                     inspeccion indica que necesita repuestos.
+  async procesarInspeccion(usuario, ordenId, datos = {}) {
+    const orden = await this.#ordenValidada('registrar_inspeccion', ordenId, usuario);
+    const inspeccion = datos.inspeccion || {};
+    const resultado = inspeccion.resultado || 'CON_HALLAZGOS';
+
+    await ordenRepo.crearInspeccion(ordenId, inspeccion);
+
+    // Inspeccion postergada: solo se registra, se retomara despues.
+    if (resultado === 'POSTERGADA') {
+      const act = await ordenRepo.actualizar(ordenId, { estado: Estado.INSPECCION_POSTERGADA });
+      return { estado: Estado.INSPECCION_POSTERGADA, orden: act };
+    }
+
+    // Sin hallazgos: no hay nada que reparar -> se cierra la orden y se libera el vehiculo.
+    if (resultado === 'SIN_HALLAZGOS') {
+      const cerrada = await ordenRepo.actualizar(ordenId, {
+        estado: Estado.CERRADO,
+        fecha_cierre: new Date().toISOString()
+      });
+      const hoy = new Date().toISOString().slice(0, 10);
+      await vehiculoRepo.actualizarEstado(orden.vehiculoId, 'DISPONIBLE', {
+        fecha_ultimo_mantenimiento: hoy
+      });
+      return { estado: Estado.CERRADO, orden: cerrada };
+    }
+
+    // Con hallazgos: la mano de obra es obligatoria.
+    const manoObra = datos.mano_obra || {};
+    const costoMO = Number(manoObra.costo || 0);
+    if (costoMO <= 0) {
+      throw AppError.badRequest('Debes registrar la mano de obra (costo mayor a 0)');
+    }
+
+    // Requerimiento de repuestos solo si la inspeccion lo indica.
+    const necesita = inspeccion.necesita_repuestos === true;
+    const items = Array.isArray(datos.items) ? datos.items : [];
+    let costoRepuestos = 0;
+    if (necesita && items.length > 0) {
+      const req = await ordenRepo.crearRequerimiento(ordenId);
+      const filas = await Promise.all(items.map((it) => this.#normalizarItem(it)));
+      await ordenRepo.agregarItems(req.id, filas);
+      costoRepuestos = filas.reduce(
+        (acc, f) => acc + (f.cantidad || 0) * Number(f.precio_unitario || 0), 0);
+    }
+
+    await ordenRepo.crearManoObra(ordenId, { costo: costoMO, observacion: manoObra.observacion });
+
+    const presupuesto = await ordenRepo.crearPresupuesto(ordenId, {
+      costo_repuestos: costoRepuestos,
+      costo_mano_obra: costoMO
+    });
+    await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });
+    return { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO, presupuesto };
+  }
+
   // ============ 6. AUTORIZAR / RECHAZAR PRESUPUESTO (Jefe) ============
   async decidirPresupuesto(usuario, presupuestoId, autorizado, motivo) {
     const presupuesto = await ordenRepo.buscarPresupuesto(presupuestoId);

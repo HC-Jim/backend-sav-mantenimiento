@@ -24,6 +24,7 @@ router.patch('/ordenes/:ordenId/conformidad', exigirRol(Rol.JEFE_LOGISTICA), c.d
 
 // ---- MECANICO ----
 router.post('/ordenes/:ordenId/inspeccion', exigirRol(Rol.MECANICO), c.registrarInspeccion);
+router.post('/ordenes/:ordenId/inspeccion-completa', exigirRol(Rol.MECANICO), c.procesarInspeccion);
 router.post('/ordenes/:ordenId/requerimientos', exigirRol(Rol.MECANICO), c.crearRequerimiento);
 router.post('/ordenes/:ordenId/mano-obra', exigirRol(Rol.MECANICO), c.registrarManoObra);
 router.post('/ordenes/:ordenId/presupuesto', exigirRol(Rol.MECANICO), c.generarPresupuesto);
