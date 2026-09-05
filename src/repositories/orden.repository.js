@@ -17,7 +17,8 @@ class OrdenRepository {
           vehiculo_id: datos.vehiculo_id,
           jefe_id: datos.jefe_id,
           mecanico_id: datos.mecanico_id || null,
-          tipo_servicio: datos.tipo_servicio,
+          tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
+          tipo_servicio: datos.tipo_servicio || null,
           descripcion: datos.descripcion,
           estado: 'PENDIENTE_INSPECCION'
         })
@@ -33,6 +34,7 @@ class OrdenRepository {
         .from('orden_mantenimiento')
         .select(`*,
           vehiculo:vehiculo_id (*),
+          tipo_mantenimiento:tipo_mantenimiento_id (*),
           inspeccion (*),
           requerimiento_repuesto ( *, repuesto_item (*) ),
           mano_obra (*),
@@ -51,11 +53,28 @@ class OrdenRepository {
   async listar(estado) {
     let q = supabase
       .from('orden_mantenimiento')
-      .select('*, vehiculo:vehiculo_id (id, placa, marca, modelo)')
+      .select('*, vehiculo:vehiculo_id (id, placa, marca, modelo), tipo_mantenimiento:tipo_mantenimiento_id (id, codigo, nombre)')
       .order('fecha_creacion', { ascending: false });
     if (estado) q = q.eq('estado', estado);
     const data = unwrap(await q);
     return data.map(OrdenMantenimiento.fromRow);
+  }
+
+  // ---------- TIPO DE MANTENIMIENTO (catalogo) ----------
+  async listarTiposMantenimiento() {
+    return unwrap(
+      await supabase
+        .from('tipo_mantenimiento')
+        .select('*')
+        .eq('activo', true)
+        .order('id', { ascending: true })
+    );
+  }
+
+  async buscarTipoMantenimiento(id) {
+    return unwrap(
+      await supabase.from('tipo_mantenimiento').select('*').eq('id', id).maybeSingle()
+    );
   }
 
   async actualizar(id, cambios) {

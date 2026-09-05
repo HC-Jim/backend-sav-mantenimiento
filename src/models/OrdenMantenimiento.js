@@ -10,6 +10,7 @@ class OrdenMantenimiento {
     this.vehiculoId = row.vehiculo_id;
     this.jefeId = row.jefe_id;
     this.mecanicoId = row.mecanico_id;
+    this.tipoMantenimientoId = row.tipo_mantenimiento_id;
     this.tipoServicio = row.tipo_servicio;
     this.descripcion = row.descripcion;
     this.estado = row.estado;
@@ -21,6 +22,7 @@ class OrdenMantenimiento {
 
     // Relaciones opcionales (cuando el repositorio las incluye en el select).
     this.vehiculo = row.vehiculo || null;
+    this.tipoMantenimiento = row.tipo_mantenimiento || null;
     this.inspecciones = row.inspeccion || [];
     this.requerimientos = row.requerimiento_repuesto || [];
     this.manosObra = row.mano_obra || [];
@@ -54,6 +56,7 @@ class OrdenMantenimiento {
       vehiculo_id: this.vehiculoId,
       jefe_id: this.jefeId,
       mecanico_id: this.mecanicoId,
+      tipo_mantenimiento_id: this.tipoMantenimientoId,
       tipo_servicio: this.tipoServicio,
       descripcion: this.descripcion,
       estado: this.estado,
@@ -64,6 +67,7 @@ class OrdenMantenimiento {
       fecha_creacion: this.fechaCreacion,
       fecha_cierre: this.fechaCierre,
       vehiculo: this.vehiculo,
+      tipo_mantenimiento: this.tipoMantenimiento,
       inspeccion: this.inspecciones,
       requerimiento_repuesto: this.requerimientos,
       mano_obra: this.manosObra,

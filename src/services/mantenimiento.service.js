@@ -25,6 +25,10 @@ class MantenimientoService {
     return repuestoRepo.listar();
   }
 
+  async tiposMantenimiento() {
+    return ordenRepo.listarTiposMantenimiento();
+  }
+
   // Comprar mas stock de un repuesto del catalogo (Jefe de Logistica).
   async comprarRepuesto(usuario, repuestoId, cantidad) {
     if (usuario.rol !== Rol.JEFE_LOGISTICA) {
@@ -70,11 +74,16 @@ class MantenimientoService {
       throw AppError.conflict('El vehiculo esta alquilado a un cliente; no se puede crear una orden de mantenimiento hasta su devolucion');
     }
 
+    // Tipo de mantenimiento: debe ser una instancia del catalogo.
+    const tipo = await ordenRepo.buscarTipoMantenimiento(datos.tipo_mantenimiento_id);
+    if (!tipo) throw AppError.badRequest('Debe seleccionar un tipo de mantenimiento valido');
+
     const orden = await ordenRepo.crear({
       vehiculo_id: datos.vehiculo_id,
       jefe_id: usuario.id,
       mecanico_id: datos.mecanico_id || null,
-      tipo_servicio: datos.tipo_servicio,
+      tipo_mantenimiento_id: tipo.id,
+      tipo_servicio: tipo.nombre, // etiqueta legible (denormalizada para compatibilidad)
       descripcion: datos.descripcion
     });
     await vehiculoRepo.actualizarEstado(datos.vehiculo_id, 'EN_MANTENIMIENTO');

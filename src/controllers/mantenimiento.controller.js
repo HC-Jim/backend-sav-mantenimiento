@@ -16,6 +16,10 @@ class MantenimientoController {
     res.json(await svc.catalogoRepuestos());
   });
 
+  listarTiposMantenimiento = asyncHandler(async (_req, res) => {
+    res.json(await svc.tiposMantenimiento());
+  });
+
   comprarRepuesto = asyncHandler(async (req, res) => {
     res.json(await svc.comprarRepuesto(req.user, req.params.repuestoId, req.body.cantidad));
   });
@@ -39,9 +43,9 @@ class MantenimientoController {
 
   // ----- Jefe de Logistica -----
   crearOrden = asyncHandler(async (req, res) => {
-    const { vehiculo_id, tipo_servicio } = req.body;
-    if (!vehiculo_id || !tipo_servicio) {
-      throw AppError.badRequest('vehiculo_id y tipo_servicio son obligatorios');
+    const { vehiculo_id, tipo_mantenimiento_id } = req.body;
+    if (!vehiculo_id || !tipo_mantenimiento_id) {
+      throw AppError.badRequest('vehiculo_id y tipo_mantenimiento_id son obligatorios');
     }
     res.status(201).json(await svc.crearOrden(req.user, req.body));
   });
