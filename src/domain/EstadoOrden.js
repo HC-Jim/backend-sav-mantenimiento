@@ -48,20 +48,10 @@ const ACCIONES = Object.freeze({
     hacia: Estado.INSPECCION_COMPLETA, // no cambia el estado de la OM
     rol: Rol.MECANICO
   },
-  comprar_repuestos: {
-    desde: [Estado.INSPECCION_COMPLETA, Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO],
-    hacia: null, // no cambia el estado de la OM
-    rol: Rol.JEFE_LOGISTICA
-  },
   registrar_mano_obra: {
     desde: [Estado.INSPECCION_COMPLETA],
     hacia: null, // no cambia el estado de la OM
     rol: Rol.MECANICO
-  },
-  aprobar_mano_obra: {
-    desde: [Estado.INSPECCION_COMPLETA],
-    hacia: null, // no cambia el estado de la OM
-    rol: Rol.JEFE_LOGISTICA
   },
   generar_presupuesto: {
     desde: [Estado.INSPECCION_COMPLETA],

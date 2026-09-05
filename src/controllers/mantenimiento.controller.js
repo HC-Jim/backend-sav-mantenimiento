@@ -46,10 +46,6 @@ class MantenimientoController {
     res.status(201).json(await svc.crearOrden(req.user, req.body));
   });
 
-  aprobarRequerimiento = asyncHandler(async (req, res) => {
-    res.json(await svc.aprobarRequerimiento(req.user, req.params.requerimientoId));
-  });
-
   decidirPresupuesto = asyncHandler(async (req, res) => {
     const { autorizado, motivo } = req.body;
     if (typeof autorizado !== 'boolean') {
@@ -78,10 +74,6 @@ class MantenimientoController {
 
   registrarManoObra = asyncHandler(async (req, res) => {
     res.status(201).json(await svc.registrarManoObra(req.user, req.params.ordenId, req.body));
-  });
-
-  aprobarManoObra = asyncHandler(async (req, res) => {
-    res.json(await svc.aprobarManoObra(req.user, req.params.manoObraId));
   });
 
   generarPresupuesto = asyncHandler(async (req, res) => {

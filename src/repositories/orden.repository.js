@@ -117,62 +117,37 @@ class OrdenRepository {
     );
   }
 
-  async marcarRequerimientoAprobado(id) {
-    return unwrap(
-      await supabase
-        .from('requerimiento_repuesto')
-        .update({ estado: 'APROBADO' })
-        .eq('id', id)
-        .select()
-        .single()
-    );
-  }
-
   // ---------- MANO DE OBRA ----------
   async crearManoObra(ordenId, { costo, observacion }) {
     return unwrap(
       await supabase
         .from('mano_obra')
-        .insert({ orden_id: ordenId, costo: costo || 0, observacion: observacion || null, estado: 'SOLICITADO' })
+        .insert({ orden_id: ordenId, costo: costo || 0, observacion: observacion || null })
         .select()
         .single()
     );
   }
 
-  async buscarManoObra(id) {
-    return unwrap(
-      await supabase.from('mano_obra').select('*').eq('id', id).maybeSingle()
-    );
-  }
-
-  async marcarManoObraAprobada(id) {
-    return unwrap(
-      await supabase.from('mano_obra').update({ estado: 'APROBADO' }).eq('id', id).select().single()
-    );
-  }
-
-  /** Mano de obra APROBADA de una orden, si existe. */
-  async manoObraAprobadaDeOrden(ordenId) {
+  /** Mano de obra registrada de una orden (la ultima), si existe. */
+  async manoObraDeOrden(ordenId) {
     return unwrap(
       await supabase
         .from('mano_obra')
         .select('*')
         .eq('orden_id', ordenId)
-        .eq('estado', 'APROBADO')
         .order('id', { ascending: false })
         .limit(1)
         .maybeSingle()
     );
   }
 
-  /** Requerimiento APROBADO de una orden (con sus items), si existe. */
-  async requerimientoAprobadoDeOrden(ordenId) {
+  /** Requerimiento de una orden (el ultimo, con sus items), si existe. */
+  async requerimientoDeOrden(ordenId) {
     return unwrap(
       await supabase
         .from('requerimiento_repuesto')
         .select('*, repuesto_item (*)')
         .eq('orden_id', ordenId)
-        .eq('estado', 'APROBADO')
         .order('id', { ascending: false })
         .limit(1)
         .maybeSingle()

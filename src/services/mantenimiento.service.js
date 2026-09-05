@@ -99,22 +99,9 @@ class MantenimientoService {
     return { ...req, repuesto_item: detalle };
   }
 
-  // ============ 4. GESTIONA Y COMPRA (Jefe) -> descuenta stock ============
-  // El Jefe aprueba el requerimiento solicitado por el Mecanico. Al aprobar
-  // se descuenta el stock de los repuestos del almacen.
-  async aprobarRequerimiento(usuario, requerimientoId) {
-    const req = await ordenRepo.buscarRequerimiento(requerimientoId);
-    if (!req) throw AppError.notFound('Requerimiento no encontrado');
-    await this.#ordenValidada('comprar_repuestos', req.orden_id, usuario);
-    if (req.estado === 'APROBADO') {
-      throw AppError.conflict('El requerimiento ya fue aprobado');
-    }
-    await this.#descontarStock(req.repuesto_item || []);
-    return ordenRepo.marcarRequerimientoAprobado(requerimientoId);
-  }
-
-  // El Mecanico registra el costo de mano de obra (+ observacion) como paso
-  // aparte; queda SOLICITADO hasta que el Jefe lo apruebe.
+  // ============ 4. REGISTRAR MANO DE OBRA (Mecanico) ============
+  // El Mecanico registra el costo de mano de obra (+ observacion). Ya NO
+  // requiere aprobacion por partes: el Jefe aprueba el presupuesto final.
   async registrarManoObra(usuario, ordenId, { costo, observacion } = {}) {
     await this.#ordenValidada('registrar_mano_obra', ordenId, usuario);
     const orden = await ordenRepo.buscarPorId(ordenId);
@@ -124,44 +111,27 @@ class MantenimientoService {
     return ordenRepo.crearManoObra(ordenId, { costo: Number(costo || 0), observacion });
   }
 
-  // El Jefe aprueba la mano de obra registrada por el Mecanico.
-  async aprobarManoObra(usuario, manoObraId) {
-    const mo = await ordenRepo.buscarManoObra(manoObraId);
-    if (!mo) throw AppError.notFound('Mano de obra no encontrada');
-    await this.#ordenValidada('aprobar_mano_obra', mo.orden_id, usuario);
-    if (mo.estado === 'APROBADO') throw AppError.conflict('La mano de obra ya fue aprobada');
-    return ordenRepo.marcarManoObraAprobada(manoObraId);
-  }
-
   // ============ 5. GENERAR PRESUPUESTO (Mecanico) ============
+  // Consolida el requerimiento de repuestos y la mano de obra registrados.
   async generarPresupuesto(usuario, ordenId, _datos) {
     await this.#ordenValidada('generar_presupuesto', ordenId, usuario);
 
-    // La mano de obra debe estar aprobada (paso aparte).
-    const manoObra = await ordenRepo.manoObraAprobadaDeOrden(ordenId);
+    const manoObra = await ordenRepo.manoObraDeOrden(ordenId);
     if (!manoObra) {
-      throw AppError.conflict('La mano de obra debe estar aprobada antes de generar el presupuesto');
+      throw AppError.conflict('Debes registrar la mano de obra antes de generar el presupuesto');
     }
 
-    // El detalle de repuestos proviene del requerimiento YA APROBADO (con su
-    // cantidad aprobada). El costo de mano de obra viene de la mano de obra aprobada.
-    const reqAprobado = await ordenRepo.requerimientoAprobadoDeOrden(ordenId);
-    const items = (reqAprobado && reqAprobado.repuesto_item) || [];
-    const filasDetalle = items.map((it) => ({
-      repuesto_id: it.repuesto_id || null,
-      descripcion: it.nombre || 'Item',
-      cantidad: it.cantidad || 1,
-      precio_unitario: Number(it.precio_unitario || 0)
-    }));
-    const costoRepuestos = filasDetalle.reduce((acc, f) => acc + f.cantidad * f.precio_unitario, 0);
+    const requerimiento = await ordenRepo.requerimientoDeOrden(ordenId);
+    const items = (requerimiento && requerimiento.repuesto_item) || [];
+    const costoRepuestos = items.reduce(
+      (acc, it) => acc + (it.cantidad || 0) * Number(it.precio_unitario || 0), 0);
 
     const presupuesto = await ordenRepo.crearPresupuesto(ordenId, {
       costo_repuestos: costoRepuestos,
       costo_mano_obra: Number(manoObra.costo || 0)
     });
-    const detalleGuardado = await ordenRepo.agregarDetallePresupuesto(presupuesto.id, filasDetalle);
     await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });
-    return { ...presupuesto, detalle_presupuesto: detalleGuardado };
+    return presupuesto;
   }
 
   // ============ 6. AUTORIZAR / RECHAZAR PRESUPUESTO (Jefe) ============
@@ -180,6 +150,9 @@ class MantenimientoService {
     });
 
     if (autorizado) {
+      // Al aprobar el presupuesto se descuenta el stock de los repuestos.
+      const requerimiento = await ordenRepo.requerimientoDeOrden(orden.id);
+      await this.#descontarStock((requerimiento && requerimiento.repuesto_item) || []);
       await ordenRepo.actualizar(orden.id, { estado: Estado.PRESUPUESTO_AUTORIZADO });
     } else {
       // Flujo alternativo: presupuesto rechazado -> orden cerrada por rechazo.
