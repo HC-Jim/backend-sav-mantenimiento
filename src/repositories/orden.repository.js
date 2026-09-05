@@ -92,7 +92,7 @@ class OrdenRepository {
     return unwrap(
       await supabase
         .from('requerimiento_repuesto')
-        .insert({ orden_id: ordenId, estado: 'SOLICITADO' })
+        .insert({ orden_id: ordenId })
         .select()
         .single()
     );
