@@ -1,6 +1,6 @@
 /**
- * Presupuesto de la orden (cabecera). El detalle por repuesto vive en
- * la tabla detalle_presupuesto y se adjunta en "detalle".
+ * Presupuesto de la orden (cabecera). Los repuestos viven en el
+ * requerimiento (repuesto_item); el presupuesto solo guarda los totales.
  */
 class Presupuesto {
   constructor(row) {
@@ -12,7 +12,6 @@ class Presupuesto {
     this.estado = row.estado;
     this.motivoRechazo = row.motivo_rechazo;
     this.creadoEn = row.creado_en;
-    this.detalle = row.detalle_presupuesto || [];
   }
 
   static fromRow(row) {
@@ -31,8 +30,7 @@ class Presupuesto {
       costo_mano_obra: this.costoManoObra,
       total: this.total,
       estado: this.estado,
-      motivo_rechazo: this.motivoRechazo,
-      detalle_presupuesto: this.detalle
+      motivo_rechazo: this.motivoRechazo
     };
   }
 }

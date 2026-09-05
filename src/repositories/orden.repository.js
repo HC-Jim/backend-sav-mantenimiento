@@ -36,7 +36,7 @@ class OrdenRepository {
           inspeccion (*),
           requerimiento_repuesto ( *, repuesto_item (*) ),
           mano_obra (*),
-          presupuesto ( *, detalle_presupuesto (*) ),
+          presupuesto ( * ),
           informe_tecnico (*),
           acta_entrega (*)`)
         .eq('id', id)
@@ -170,21 +170,11 @@ class OrdenRepository {
     );
   }
 
-  async agregarDetallePresupuesto(presupuestoId, filas) {
-    if (!filas.length) return [];
-    return unwrap(
-      await supabase
-        .from('detalle_presupuesto')
-        .insert(filas.map((f) => ({ ...f, presupuesto_id: presupuestoId })))
-        .select()
-    );
-  }
-
   async buscarPresupuesto(id) {
     const data = unwrap(
       await supabase
         .from('presupuesto')
-        .select('*, detalle_presupuesto (*)')
+        .select('*')
         .eq('id', id)
         .maybeSingle()
     );
