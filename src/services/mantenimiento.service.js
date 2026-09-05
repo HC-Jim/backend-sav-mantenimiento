@@ -42,7 +42,7 @@ class MantenimientoService {
   }
 
   async listarMecanicos() {
-    return usuarioRepo.listarPorRol(Rol.MECANICO);
+    return usuarioRepo.listarMecanicosDetalle();
   }
 
   async obtenerOrden(ordenId) {
