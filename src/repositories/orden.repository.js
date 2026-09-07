@@ -18,7 +18,6 @@ class OrdenRepository {
           jefe_id: datos.jefe_id,
           mecanico_id: datos.mecanico_id || null,
           tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
-          tipo_servicio: datos.tipo_servicio || null,
           descripcion: datos.descripcion,
           estado: 'PENDIENTE_INSPECCION'
         })
