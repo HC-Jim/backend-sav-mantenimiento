@@ -26,6 +26,10 @@ router.post('/clientes', clientes, c.crearCliente);
 router.patch('/clientes/:id', clientes, c.actualizarCliente);
 router.delete('/clientes/:id', clientes, c.eliminarCliente);
 
+// ---- Usuarios (alta de usuario + fila de subtipo, sin triggers) ----
+router.get('/usuarios', admin, c.listarUsuarios);
+router.post('/usuarios', admin, c.crearUsuario);
+
 // ---- Seguros / Polizas (CUS017 / CUS018) ----
 router.get('/seguros', admin, c.listarSeguros);
 router.get('/seguros/por-vencer', admin, c.segurosPorVencer);

@@ -19,6 +19,10 @@ class GestionController {
   actualizarCliente = asyncHandler(async (req, res) => res.json(await svc.actualizarCliente(req.params.id, req.body)));
   eliminarCliente = asyncHandler(async (req, res) => res.json(await svc.eliminarCliente(req.params.id)));
 
+  // Usuarios
+  listarUsuarios = asyncHandler(async (_req, res) => res.json(await svc.listarUsuarios()));
+  crearUsuario = asyncHandler(async (req, res) => res.status(201).json(await svc.crearUsuario(req.body)));
+
   // Seguros
   listarSeguros = asyncHandler(async (_req, res) => res.json(await svc.listarSeguros()));
   segurosPorVencer = asyncHandler(async (req, res) => res.json(await svc.segurosPorVencer(req.query.dias)));

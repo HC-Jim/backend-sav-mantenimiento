@@ -1,6 +1,9 @@
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const clienteRepo = require('../repositories/cliente.repository');
 const seguroRepo = require('../repositories/seguro.repository');
+const usuarioRepo = require('../repositories/usuario.repository');
+const Usuario = require('../models/Usuario');
+const { Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
 
 /**
@@ -88,6 +91,37 @@ class GestionService {
   async eliminarCliente(id) {
     await this.#existe(clienteRepo, id, 'Cliente');
     return clienteRepo.eliminar(id);
+  }
+
+  // ---------- USUARIOS ----------
+  listarUsuarios() {
+    return usuarioRepo.listarTodos();
+  }
+
+  /**
+   * Alta de usuario (Administrador). Crea el usuario y su fila de subtipo
+   * segun el rol (herencia), todo en el backend (sin triggers de BD).
+   */
+  async crearUsuario(datos) {
+    const { nombre, email, password, rol } = datos;
+    if (!nombre || !email || !password || !rol) {
+      throw AppError.badRequest('nombre, email, password y rol son obligatorios');
+    }
+    if (!Object.values(Rol).includes(rol)) {
+      throw AppError.badRequest('Rol invalido');
+    }
+    const existente = await usuarioRepo.buscarPorEmail(email);
+    if (existente) throw AppError.conflict('Ya existe un usuario con ese email');
+
+    const usuario = await usuarioRepo.crear({
+      nombre,
+      email,
+      password_hash: Usuario.hashPassword(password),
+      rol
+    });
+    // Herencia: crea la fila del subtipo correspondiente (en el backend).
+    await usuarioRepo.crearFilaSubtipo(usuario.id, rol);
+    return usuario;
   }
 
   // ---------- SEGUROS ----------

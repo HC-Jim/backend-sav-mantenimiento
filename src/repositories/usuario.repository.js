@@ -33,11 +33,46 @@ class UsuarioRepository {
     return Usuario.fromRow(this.#conCliente(data));
   }
 
+  async crear({ nombre, email, password_hash, rol, estado = 'ACTIVO' }) {
+    const data = unwrap(
+      await supabase.from('usuario')
+        .insert({ nombre, email, password_hash, rol, estado })
+        .select('*').single()
+    );
+    return Usuario.fromRow(data);
+  }
+
+  /**
+   * Crea la fila del subtipo segun el rol (herencia usuario -> rol).
+   * Se hace en el backend (sin triggers de BD).
+   */
+  async crearFilaSubtipo(usuarioId, rol) {
+    const tabla = {
+      MECANICO: 'mecanico',
+      JEFE_LOGISTICA: 'jefe_logistica',
+      CAJERO: 'cajero',
+      ADMINISTRADOR: 'administrador'
+    }[rol];
+    if (!tabla) return null; // CLIENTE / ASESOR_VENTAS no tienen tabla de subtipo
+    return unwrap(
+      await supabase.from(tabla).insert({ usuario_id: usuarioId }).select('*').single()
+    );
+  }
+
   async listarPorRol(rol) {
     const data = unwrap(
       await supabase.from('usuario').select('*').eq('rol', rol).eq('estado', 'ACTIVO')
     );
     return data.map(Usuario.fromRow);
+  }
+
+  async listarTodos() {
+    const data = unwrap(
+      await supabase.from('usuario')
+        .select('id, nombre, email, rol, estado, creado_en')
+        .order('id', { ascending: true })
+    );
+    return data;
   }
 
   /**
