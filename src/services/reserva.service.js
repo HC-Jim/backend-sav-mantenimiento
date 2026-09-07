@@ -8,9 +8,10 @@ const { Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
 
 /**
- * Orquesta el proceso de alquiler visto por el Cliente:
- * catalogo, reserva, pago de garantia, pago del alquiler + devolucion de
- * garantia y cancelacion con penalidad.
+ * Proceso de reserva visto por el Cliente:
+ *   1. Generar Orden de Reserva  -> estado POR_PAGAR
+ *   2. Pagar Orden de Reserva    -> paga garantia + alquiler -> RESERVADO
+ * El Cajero cierra devolviendo la garantia (RESERVADO -> FINALIZADA).
  *
  * La "pasarela de pago" esta simulada: todo pago se registra como PAGADO.
  */
@@ -37,14 +38,14 @@ class ReservaService {
     return { disponible: true };
   }
 
-  // ============ CREAR RESERVA ============
-  async crearReserva(usuario, { vehiculo_id, fecha_inicio, fecha_fin }) {
+  // ============ 1. GENERAR ORDEN DE RESERVA (Cliente) ============
+  // El Cliente busca el vehiculo y genera la orden; queda POR_PAGAR.
+  async generarOrdenReserva(usuario, { vehiculo_id, fecha_inicio, fecha_fin }) {
     const clienteId = this.#exigirCliente(usuario);
     if (!vehiculo_id) throw AppError.badRequest('vehiculo_id es obligatorio');
     this.#validarFechas(fecha_inicio, fecha_fin);
 
     const vehiculo = await busqueda.buscarVehiculo(vehiculo_id); // <<include>> Buscar Vehiculo
-
     const disp = await this.verificarDisponibilidad(vehiculo_id, fecha_inicio, fecha_fin);
     if (!disp.disponible) throw AppError.conflict(disp.motivo);
 
@@ -56,7 +57,7 @@ class ReservaService {
       vehiculo_id,
       fecha_inicio,
       fecha_fin,
-      estado: EstadoReserva.PENDIENTE_PAGO_GARANTIA,
+      estado: EstadoReserva.POR_PAGAR,
       monto_total_estimado: tarifa * dias,
       garantia_monto: tarifa * PoliticasAlquiler.FACTOR_GARANTIA
     });
@@ -79,48 +80,31 @@ class ReservaService {
     return reserva;
   }
 
-  // ============ PAGAR GARANTIA (confirma la reserva) ============
-  async pagarGarantia(usuario, reservaId, { metodo } = {}) {
-    const reserva = await this.#reservaValidada('pagar_garantia', usuario, reservaId);
+  // ============ 2. PAGAR ORDEN DE RESERVA (Cliente) ============
+  // Un solo paso: paga la garantia y el alquiler; la reserva queda RESERVADO
+  // y el vehiculo ALQUILADO.
+  async pagarOrdenReserva(usuario, reservaId, { metodo } = {}) {
+    const reserva = await this.#reservaValidada('pagar_orden', usuario, reservaId);
+    const met = metodo || 'TARJETA';
 
-    const pago = await reservaRepo.crearPago({
-      reserva_id: reserva.id,
-      monto: reserva.garantiaMonto,
-      concepto: 'GARANTIA',
-      metodo: metodo || 'TARJETA',
-      estado: 'PAGADO'
+    const pagoGarantia = await reservaRepo.crearPago({
+      reserva_id: reserva.id, monto: reserva.garantiaMonto,
+      concepto: 'GARANTIA', metodo: met, estado: 'PAGADO'
     });
-    // <<include>> Emitir Comprobante
-    const comp = await comprobante.emitir({ pago_id: pago.id, monto_total: reserva.garantiaMonto });
+    const pagoAlquiler = await reservaRepo.crearPago({
+      reserva_id: reserva.id, monto: reserva.montoTotalEstimado,
+      concepto: 'ALQUILER', metodo: met, estado: 'PAGADO'
+    });
+    // <<include>> Emitir Comprobante (por el total pagado)
+    const total = Number(reserva.garantiaMonto) + Number(reserva.montoTotalEstimado);
+    const comp = await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: total });
 
-    const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.CONFIRMADA });
+    const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.RESERVADO });
     await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'ALQUILADO');
-    return { reserva: actualizada, pago, comprobante: comp };
-  }
-
-  // ============ APROBAR RESERVA (Cajero) -> CONFIRMADA ============
-  // El Cajero acepta la orden de reserva y emite el comprobante que demuestra
-  // el pago de la garantia. Recien ahi el vehiculo queda ALQUILADO.
-  async aprobarReserva(usuario, reservaId) {
-    this.#exigirCajero(usuario);
-    const reserva = await this.#reservaValidada('aprobar_reserva', usuario, reservaId);
-
-    let comp = null;
-    if (reserva.cotizacionId) {
-      const pagos = await reservaRepo.pagosDeCotizacion(reserva.cotizacionId);
-      const pagoGarantia = pagos.find((p) => p.concepto === 'GARANTIA');
-      if (pagoGarantia) {
-        // <<include>> Emitir Comprobante (reserva)
-        comp = await comprobante.emitir({ pago_id: pagoGarantia.id, monto_total: reserva.montoTotalEstimado });
-      }
-    }
-    const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.CONFIRMADA });
-    await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'ALQUILADO');
-    return { reserva: actualizada, comprobante: comp };
+    return { reserva: actualizada, pago_garantia: pagoGarantia, pago_alquiler: pagoAlquiler, comprobante: comp };
   }
 
   // ============ COBRAR DIAS EXTRA (Cajero) ============
-  // Cargo por retraso: dias extra x precio por dia (segun la tarifa pactada) + comprobante.
   async cobrarDiasExtra(usuario, reservaId, { dias } = {}) {
     this.#exigirCajero(usuario);
     const reserva = await reservaRepo.buscarPorId(reservaId);
@@ -135,38 +119,15 @@ class ReservaService {
     const pago = await reservaRepo.crearPago({
       reserva_id: reserva.id, monto, concepto: 'EXTRA', metodo: 'TARJETA', estado: 'PAGADO'
     });
-    // <<include>> Emitir Comprobante (dias extra)
     const comp = await comprobante.emitir({ pago_id: pago.id, monto_total: monto });
     return { dias: n, tarifa_dia: Number(tarifaDia.toFixed(2)), monto, comprobante: comp };
   }
 
-  // ============ PAGAR ALQUILER (Cliente/Cajero) -> EN_CURSO ============
-  // Registra el pago del alquiler y entrega el vehiculo. La garantia queda
-  // retenida; el Cajero la devuelve luego con "Devolver Garantia".
-  async pagarAlquiler(usuario, reservaId, { metodo } = {}) {
-    const reserva = await this.#reservaValidada('pagar_alquiler', usuario, reservaId);
-
-    const pagoAlquiler = await reservaRepo.crearPago({
-      reserva_id: reserva.id,
-      monto: reserva.montoTotalEstimado,
-      concepto: 'ALQUILER',
-      metodo: metodo || 'TARJETA',
-      estado: 'PAGADO'
-    });
-    // <<include>> Emitir Comprobante
-    const comp = await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: reserva.montoTotalEstimado });
-
-    const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.EN_CURSO });
-    return { reserva: actualizada, pago_alquiler: pagoAlquiler, comprobante: comp };
-  }
-
   // ============ DEVOLVER GARANTIA (Cajero) -> FINALIZADA ============
-  // <<include>> Pagar Garantia: requiere que la garantia haya sido pagada.
   async devolverGarantia(usuario, reservaId, { metodo, deducciones = 0 } = {}) {
     this.#exigirCajero(usuario);
     const reserva = await this.#reservaValidada('devolver_garantia', usuario, reservaId);
 
-    // <<include>> Pagar Garantia: verificar el pago de garantia del cliente
     const pagos = await reservaRepo.pagosDeReserva(reserva.id);
     if (!pagos.some((p) => p.concepto === 'GARANTIA')) {
       throw AppError.conflict('No existe un pago de garantia registrado para esta reserva');
@@ -175,7 +136,6 @@ class ReservaService {
     const ded = Math.max(Number(deducciones) || 0, 0);
     const devolucion = Math.max(reserva.garantiaMonto - ded, 0);
 
-    // Registro del alquiler (entrega/devolucion del vehiculo)
     await reservaRepo.crearAlquiler({
       reserva_id: reserva.id,
       vehiculo_id: reserva.vehiculoId,
@@ -187,7 +147,6 @@ class ReservaService {
     const pagoDevolucion = await reservaRepo.crearPago({
       reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: metodo || 'TARJETA', estado: 'PAGADO'
     });
-    // <<include>> Emitir Comprobante
     const comp = await comprobante.emitir({ pago_id: pagoDevolucion.id, monto_total: devolucion });
 
     const actualizada = await reservaRepo.actualizar(reserva.id, {
@@ -200,7 +159,6 @@ class ReservaService {
   }
 
   // ============ EMITIR COMPROBANTE (Cajero) ============
-  // <<include>> Pagar Alquiler: emite el comprobante del pago de alquiler.
   async emitirComprobante(usuario, reservaId) {
     this.#exigirCajero(usuario);
     const reserva = await reservaRepo.buscarPorId(reservaId);
@@ -209,7 +167,7 @@ class ReservaService {
     const pagos = await reservaRepo.pagosDeReserva(reservaId);
     const pagoAlquiler = pagos.find((p) => p.concepto === 'ALQUILER');
     if (!pagoAlquiler) {
-      throw AppError.conflict('Aun no se ha registrado el pago de alquiler de esta reserva');
+      throw AppError.conflict('Aun no se ha registrado el pago de la orden de reserva');
     }
     const comp = await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: pagoAlquiler.monto });
     const comprobantes = await reservaRepo.comprobantesDeReserva(reservaId);
@@ -219,69 +177,6 @@ class ReservaService {
   async listarComprobantes(usuario, reservaId) {
     this.#exigirCajero(usuario);
     return reservaRepo.comprobantesDeReserva(reservaId);
-  }
-
-  // ============ GESTIONAR CANCELACION (Cajero) ============
-  // <<include>> Cancelar Reserva: aplica la regla de 48h y emite comprobante.
-  async gestionarCancelacion(usuario, reservaId, { motivo } = {}) {
-    this.#exigirCajero(usuario);
-    const reserva = await this.#reservaValidada('gestionar_cancelacion', usuario, reservaId);
-
-    const horasRestantes = (new Date(reserva.fechaInicio) - new Date()) / (1000 * 60 * 60);
-    const conPenalidad = horasRestantes < PoliticasAlquiler.HORAS_LIMITE_CANCELACION;
-    const penalidad = conPenalidad
-      ? Number((reserva.garantiaMonto * PoliticasAlquiler.PORCENTAJE_PENALIDAD).toFixed(2))
-      : 0;
-    const devolucion = Math.max(reserva.garantiaMonto - penalidad, 0);
-
-    let comp = null;
-    if (devolucion > 0) {
-      const pagoDev = await reservaRepo.crearPago({
-        reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: 'TARJETA', estado: 'PAGADO'
-      });
-      // <<include>> Emitir Comprobante
-      comp = await comprobante.emitir({ pago_id: pagoDev.id, monto_total: devolucion });
-    }
-
-    const actualizada = await reservaRepo.actualizar(reserva.id, {
-      estado: EstadoReserva.CANCELADA,
-      penalidad,
-      monto_devuelto: devolucion,
-      motivo_cancelacion: motivo || 'Cancelacion gestionada en ventanilla (Cajero)',
-      fecha_cancelacion: new Date().toISOString()
-    });
-    await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'DISPONIBLE');
-    return { reserva: actualizada, penalidad, devolucion, con_penalidad: conPenalidad, comprobante: comp };
-  }
-
-  // ============ CANCELAR RESERVA (con regla de 48h) ============
-  async cancelarReserva(usuario, reservaId, { motivo } = {}) {
-    const reserva = await this.#reservaValidada('cancelar', usuario, reservaId);
-
-    const horasRestantes = (new Date(reserva.fechaInicio) - new Date()) / (1000 * 60 * 60);
-    const conPenalidad = horasRestantes < PoliticasAlquiler.HORAS_LIMITE_CANCELACION;
-    const penalidad = conPenalidad
-      ? Number((reserva.garantiaMonto * PoliticasAlquiler.PORCENTAJE_PENALIDAD).toFixed(2))
-      : 0;
-    const devolucion = Math.max(reserva.garantiaMonto - penalidad, 0);
-
-    if (devolucion > 0) {
-      const pagoDev = await reservaRepo.crearPago({
-        reserva_id: reserva.id, monto: devolucion, concepto: 'DEVOLUCION', metodo: 'TARJETA', estado: 'PAGADO'
-      });
-      // <<include>> Emitir Comprobante (de la cancelacion / devolucion)
-      await comprobante.emitir({ pago_id: pagoDev.id, monto_total: devolucion });
-    }
-
-    const actualizada = await reservaRepo.actualizar(reserva.id, {
-      estado: EstadoReserva.CANCELADA,
-      penalidad,
-      monto_devuelto: devolucion,
-      motivo_cancelacion: motivo || 'Cancelacion voluntaria del cliente',
-      fecha_cancelacion: new Date().toISOString()
-    });
-    await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'DISPONIBLE');
-    return { reserva: actualizada, penalidad, devolucion, con_penalidad: conPenalidad };
   }
 
   // ============ Helpers privados ============
@@ -307,7 +202,6 @@ class ReservaService {
   async #reservaValidada(accion, usuario, reservaId) {
     const reserva = await reservaRepo.buscarPorId(reservaId);
     if (!reserva) throw AppError.notFound('Reserva no encontrada');
-    // Cliente: solo su propia reserva. Cajero: cualquiera (atencion en ventanilla).
     if (usuario.rol === Rol.CLIENTE) {
       if (!usuario.clienteId || reserva.clienteId !== usuario.clienteId) {
         throw AppError.forbidden('No puedes operar una reserva de otro cliente');

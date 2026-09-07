@@ -13,23 +13,19 @@ router.get('/vehiculos', c.catalogo);                 // ?todos=true para inclui
 router.get('/vehiculos/:vehiculoId', c.detalleVehiculo);
 router.get('/disponibilidad', c.disponibilidad);      // ?vehiculo_id=&fecha_inicio=&fecha_fin=
 
-// ---- Gestion interna (Jefe, Cajero, Asesor de Ventas) ----
-router.get('/reservas/todas', exigirRol(Rol.JEFE_LOGISTICA, Rol.CAJERO, Rol.ASESOR_VENTAS), c.listarTodas);
+// ---- Gestion interna (Jefe, Cajero) ----
+router.get('/reservas/todas', exigirRol(Rol.JEFE_LOGISTICA, Rol.CAJERO), c.listarTodas);
 
 // ---- Cliente ----
-// La reserva la genera el Asesor desde una cotizacion pagada (ver /api/ventas).
+router.post('/reservas', exigirRol(Rol.CLIENTE), c.generarOrdenReserva);            // 1. Generar Orden de Reserva -> POR_PAGAR
 router.get('/reservas/mias', exigirRol(Rol.CLIENTE), c.misReservas);
 router.get('/reservas/:reservaId', c.verReserva);
-// Cliente opera sus reservas; Cajero atiende en ventanilla cualquier reserva.
-router.patch('/reservas/:reservaId/pagar-alquiler', exigirRol(Rol.CLIENTE, Rol.CAJERO), c.pagarAlquiler);
-router.patch('/reservas/:reservaId/cancelar', exigirRol(Rol.CLIENTE, Rol.CAJERO), c.cancelar);
+router.patch('/reservas/:reservaId/pagar', exigirRol(Rol.CLIENTE), c.pagarOrdenReserva); // 2. Pagar Orden de Reserva -> RESERVADO
 
 // ---- Cajero (ventanilla) ----
-router.patch('/reservas/:reservaId/aprobar', exigirRol(Rol.CAJERO), c.aprobarReserva);                  // acepta la orden de reserva + comprobante
 router.patch('/reservas/:reservaId/cobrar-extra', exigirRol(Rol.CAJERO), c.cobrarDiasExtra);            // dias extra x precio/dia + comprobante
-router.patch('/reservas/:reservaId/devolver-garantia', exigirRol(Rol.CAJERO), c.devolverGarantia);      // <<include>> Pagar Garantia
-router.patch('/reservas/:reservaId/gestionar-cancelacion', exigirRol(Rol.CAJERO), c.gestionarCancelacion); // <<include>> Cancelar Reserva
-router.post('/reservas/:reservaId/emitir-comprobante', exigirRol(Rol.CAJERO), c.emitirComprobante);     // <<include>> Pagar Alquiler
+router.patch('/reservas/:reservaId/devolver-garantia', exigirRol(Rol.CAJERO), c.devolverGarantia);      // RESERVADO -> FINALIZADA
+router.post('/reservas/:reservaId/emitir-comprobante', exigirRol(Rol.CAJERO), c.emitirComprobante);
 router.get('/reservas/:reservaId/comprobantes', exigirRol(Rol.CAJERO), c.listarComprobantes);
 
 module.exports = router;

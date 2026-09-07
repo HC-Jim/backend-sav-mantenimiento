@@ -20,9 +20,9 @@ class ReservaController {
     res.json(await svc.verificarDisponibilidad(vehiculo_id, fecha_inicio, fecha_fin));
   });
 
-  // ----- Reservas -----
-  crearReserva = asyncHandler(async (req, res) => {
-    res.status(201).json(await svc.crearReserva(req.user, req.body));
+  // ----- Reservas (Cliente) -----
+  generarOrdenReserva = asyncHandler(async (req, res) => {
+    res.status(201).json(await svc.generarOrdenReserva(req.user, req.body));
   });
 
   misReservas = asyncHandler(async (req, res) => {
@@ -37,33 +37,17 @@ class ReservaController {
     res.json(await svc.obtenerReserva(req.user, req.params.reservaId));
   });
 
-  pagarGarantia = asyncHandler(async (req, res) => {
-    res.json(await svc.pagarGarantia(req.user, req.params.reservaId, req.body));
-  });
-
-  pagarAlquiler = asyncHandler(async (req, res) => {
-    res.json(await svc.pagarAlquiler(req.user, req.params.reservaId, req.body));
-  });
-
-  cancelar = asyncHandler(async (req, res) => {
-    res.json(await svc.cancelarReserva(req.user, req.params.reservaId, req.body));
+  pagarOrdenReserva = asyncHandler(async (req, res) => {
+    res.json(await svc.pagarOrdenReserva(req.user, req.params.reservaId, req.body));
   });
 
   // ----- Acciones del Cajero -----
-  aprobarReserva = asyncHandler(async (req, res) => {
-    res.json(await svc.aprobarReserva(req.user, req.params.reservaId));
-  });
-
   cobrarDiasExtra = asyncHandler(async (req, res) => {
     res.json(await svc.cobrarDiasExtra(req.user, req.params.reservaId, req.body));
   });
 
   devolverGarantia = asyncHandler(async (req, res) => {
     res.json(await svc.devolverGarantia(req.user, req.params.reservaId, req.body));
-  });
-
-  gestionarCancelacion = asyncHandler(async (req, res) => {
-    res.json(await svc.gestionarCancelacion(req.user, req.params.reservaId, req.body));
   });
 
   emitirComprobante = asyncHandler(async (req, res) => {

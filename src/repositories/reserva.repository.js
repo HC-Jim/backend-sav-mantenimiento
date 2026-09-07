@@ -57,7 +57,7 @@ class ReservaRepository {
 
   /**
    * Reservas que ocupan un vehiculo en un rango de fechas (para validar
-   * disponibilidad). Solo cuentan las CONFIRMADA / EN_CURSO.
+   * disponibilidad). Cuentan las POR_PAGAR / RESERVADO (aun activas).
    */
   async reservasQueSolapan(vehiculoId, fechaInicio, fechaFin) {
     return unwrap(
@@ -65,7 +65,7 @@ class ReservaRepository {
         .from('reserva')
         .select('id, fecha_inicio, fecha_fin, estado')
         .eq('vehiculo_id', vehiculoId)
-        .in('estado', ['CONFIRMADA', 'EN_CURSO'])
+        .in('estado', ['POR_PAGAR', 'RESERVADO'])
         .lte('fecha_inicio', fechaFin)
         .gte('fecha_fin', fechaInicio)
     );
@@ -88,13 +88,6 @@ class ReservaRepository {
   async pagosDeReserva(reservaId) {
     return unwrap(
       await supabase.from('pago').select('*').eq('reserva_id', reservaId)
-    );
-  }
-
-  /** Pagos asociados a una cotizacion (garantia). */
-  async pagosDeCotizacion(cotizacionId) {
-    return unwrap(
-      await supabase.from('pago').select('*').eq('cotizacion_id', cotizacionId)
     );
   }
 

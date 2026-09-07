@@ -1,30 +1,23 @@
 /**
- * Maquina de estados de la Reserva de alquiler.
+ * Maquina de estados de la Orden de Reserva.
  *
- *  PENDIENTE_PAGO_GARANTIA --(pagar garantia [Cliente])--> CONFIRMADA
- *  CONFIRMADA --(pagar alquiler [Cliente/Cajero])--> EN_CURSO
- *  EN_CURSO   --(devolver garantia [Cajero])--> FINALIZADA
- *  CONFIRMADA/EN_CURSO --(cancelar / gestionar cancelacion)--> CANCELADA
+ *  POR_PAGAR --(pagar orden [Cliente])--> RESERVADO
+ *  RESERVADO --(devolver garantia [Cajero])--> FINALIZADA
+ *
+ * El Cliente genera la orden (POR_PAGAR) y luego la paga (garantia + alquiler)
+ * quedando RESERVADO. El Cajero cierra devolviendo la garantia (FINALIZADA).
  */
 const EstadoReserva = Object.freeze({
-  PENDIENTE_APROBACION: 'PENDIENTE_APROBACION', // orden de reserva generada, pendiente de aprobacion del Cajero
-  PENDIENTE_PAGO_GARANTIA: 'PENDIENTE_PAGO_GARANTIA',
-  CONFIRMADA: 'CONFIRMADA',
-  EN_CURSO: 'EN_CURSO',
-  FINALIZADA: 'FINALIZADA',
-  CANCELADA: 'CANCELADA'
+  POR_PAGAR: 'POR_PAGAR',
+  RESERVADO: 'RESERVADO',
+  FINALIZADA: 'FINALIZADA'
 });
 
-const FINALES = [EstadoReserva.FINALIZADA, EstadoReserva.CANCELADA];
+const FINALES = [EstadoReserva.FINALIZADA];
 
 const ACCIONES = Object.freeze({
-  // El Cajero acepta la orden de reserva y emite el comprobante.
-  aprobar_reserva:       { desde: [EstadoReserva.PENDIENTE_APROBACION], hacia: EstadoReserva.CONFIRMADA },
-  pagar_garantia:        { desde: [EstadoReserva.PENDIENTE_PAGO_GARANTIA], hacia: EstadoReserva.CONFIRMADA },
-  pagar_alquiler:        { desde: [EstadoReserva.CONFIRMADA], hacia: EstadoReserva.EN_CURSO },
-  devolver_garantia:     { desde: [EstadoReserva.EN_CURSO], hacia: EstadoReserva.FINALIZADA },
-  cancelar:              { desde: [EstadoReserva.PENDIENTE_APROBACION, EstadoReserva.CONFIRMADA], hacia: EstadoReserva.CANCELADA },
-  gestionar_cancelacion: { desde: [EstadoReserva.PENDIENTE_APROBACION, EstadoReserva.CONFIRMADA, EstadoReserva.EN_CURSO], hacia: EstadoReserva.CANCELADA }
+  pagar_orden:       { desde: [EstadoReserva.POR_PAGAR], hacia: EstadoReserva.RESERVADO },
+  devolver_garantia: { desde: [EstadoReserva.RESERVADO], hacia: EstadoReserva.FINALIZADA }
 });
 
 class MaquinaReserva {
