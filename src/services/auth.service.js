@@ -21,6 +21,10 @@ class AuthService {
     if (!usuario.estaActivo()) {
       throw AppError.forbidden('El usuario esta inactivo');
     }
+    // El rol Asesor de Ventas fue eliminado del sistema: sin acceso.
+    if (usuario.rol === 'ASESOR_VENTAS') {
+      throw AppError.forbidden('Este rol ya no tiene acceso al sistema');
+    }
     const token = this.#firmarToken(usuario);
     return { token, usuario: usuario.toJSON() };
   }

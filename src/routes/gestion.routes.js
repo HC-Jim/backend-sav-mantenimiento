@@ -8,10 +8,9 @@ const router = Router();
 // Todo requiere autenticacion; el rol se valida por ruta.
 router.use(autenticar);
 
-// Administracion de flota/precios/seguros: Administrador (datos maestros).
+// Administracion de flota/precios/seguros/usuarios/clientes: Administrador.
 const admin = exigirRol(Rol.ADMINISTRADOR);
-// Clientes (Mantener Cliente / CRUD Cliente): Asesor de Ventas y Administrador.
-const clientes = exigirRol(Rol.ASESOR_VENTAS, Rol.ADMINISTRADOR);
+const clientes = admin;
 
 // ---- Vehiculos (Mantener Vehiculo + precio por vehiculo) ----
 router.get('/vehiculos', admin, c.listarVehiculos);

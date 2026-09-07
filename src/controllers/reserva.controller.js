@@ -42,10 +42,6 @@ class ReservaController {
   });
 
   // ----- Acciones del Cajero -----
-  cobrarDiasExtra = asyncHandler(async (req, res) => {
-    res.json(await svc.cobrarDiasExtra(req.user, req.params.reservaId, req.body));
-  });
-
   devolverGarantia = asyncHandler(async (req, res) => {
     res.json(await svc.devolverGarantia(req.user, req.params.reservaId, req.body));
   });

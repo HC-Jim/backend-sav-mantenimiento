@@ -23,7 +23,6 @@ router.get('/reservas/:reservaId', c.verReserva);
 router.patch('/reservas/:reservaId/pagar', exigirRol(Rol.CLIENTE), c.pagarOrdenReserva); // 2. Pagar Orden de Reserva -> RESERVADO
 
 // ---- Cajero (ventanilla) ----
-router.patch('/reservas/:reservaId/cobrar-extra', exigirRol(Rol.CAJERO), c.cobrarDiasExtra);            // dias extra x precio/dia + comprobante
 router.patch('/reservas/:reservaId/devolver-garantia', exigirRol(Rol.CAJERO), c.devolverGarantia);      // RESERVADO -> FINALIZADA
 router.post('/reservas/:reservaId/emitir-comprobante', exigirRol(Rol.CAJERO), c.emitirComprobante);
 router.get('/reservas/:reservaId/comprobantes', exigirRol(Rol.CAJERO), c.listarComprobantes);

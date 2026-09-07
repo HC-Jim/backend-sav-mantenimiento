@@ -105,25 +105,6 @@ class ReservaService {
     return { reserva: actualizada, pago_garantia: pagoGarantia, pago_alquiler: pagoAlquiler, comprobante: comp };
   }
 
-  // ============ COBRAR DIAS EXTRA (Cajero) ============
-  async cobrarDiasExtra(usuario, reservaId, { dias } = {}) {
-    this.#exigirCajero(usuario);
-    const reserva = await reservaRepo.buscarPorId(reservaId);
-    if (!reserva) throw AppError.notFound('Reserva no encontrada');
-    const n = Math.trunc(Number(dias) || 0);
-    if (n <= 0) throw AppError.badRequest('Los dias extra deben ser mayor a 0');
-
-    const diasPactados = Math.max(PoliticasAlquiler.diasEntre(reserva.fechaInicio, reserva.fechaFin), 1);
-    const tarifaDia = reserva.montoTotalEstimado / diasPactados;
-    const monto = Number((tarifaDia * n).toFixed(2));
-
-    const pago = await reservaRepo.crearPago({
-      reserva_id: reserva.id, monto, concepto: 'EXTRA', metodo: 'TARJETA', estado: 'PAGADO'
-    });
-    const comp = await comprobante.emitir({ pago_id: pago.id, monto_total: monto });
-    return { dias: n, tarifa_dia: Number(tarifaDia.toFixed(2)), monto, comprobante: comp };
-  }
-
   // ============ DEVOLVER GARANTIA (Cajero) -> FINALIZADA ============
   async devolverGarantia(usuario, reservaId, { metodo, deducciones = 0 } = {}) {
     this.#exigirCajero(usuario);
