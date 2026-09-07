@@ -2,6 +2,7 @@ const reservaRepo = require('../repositories/reserva.repository');
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const busqueda = require('./busqueda.service');          // <<include>> Buscar Vehiculo
 const comprobante = require('./comprobante.service');     // <<include>> Emitir Comprobante
+const precioService = require('./precio.service');        // precio por dia (normal/campania)
 const PoliticasAlquiler = require('../domain/PoliticasAlquiler');
 const { EstadoReserva, MaquinaReserva } = require('../domain/EstadoReserva');
 const { Rol } = require('../domain/EstadoOrden');
@@ -50,7 +51,7 @@ class ReservaService {
     if (!disp.disponible) throw AppError.conflict(disp.motivo);
 
     const dias = PoliticasAlquiler.diasEntre(fecha_inicio, fecha_fin);
-    const tarifa = vehiculo.tarifaDiaria || 0;
+    const { tarifa } = precioService.tarifaPara(vehiculo, dias); // precio normal/campania
 
     return reservaRepo.crear({
       cliente_id: clienteId,
