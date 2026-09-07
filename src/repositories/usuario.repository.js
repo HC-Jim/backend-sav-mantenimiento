@@ -6,18 +6,31 @@ const Usuario = require('../models/Usuario');
  * Acceso a datos de la tabla usuario.
  */
 class UsuarioRepository {
+  // El cliente asociado a la cuenta se resuelve por cliente.usuario_id
+  // (herencia); se expone como cliente_id para el modelo Usuario.
+  static #SELECT = '*, cliente_rel:cliente!cliente_usuario_id_fkey (id)';
+
+  #conCliente(row) {
+    if (row && row.cliente_rel) {
+      row.cliente_id = Array.isArray(row.cliente_rel)
+        ? (row.cliente_rel[0] && row.cliente_rel[0].id) || null
+        : row.cliente_rel.id;
+    }
+    return row;
+  }
+
   async buscarPorEmail(email) {
     const data = unwrap(
-      await supabase.from('usuario').select('*').eq('email', email).maybeSingle()
+      await supabase.from('usuario').select(UsuarioRepository.#SELECT).eq('email', email).maybeSingle()
     );
-    return Usuario.fromRow(data);
+    return Usuario.fromRow(this.#conCliente(data));
   }
 
   async buscarPorId(id) {
     const data = unwrap(
-      await supabase.from('usuario').select('*').eq('id', id).maybeSingle()
+      await supabase.from('usuario').select(UsuarioRepository.#SELECT).eq('id', id).maybeSingle()
     );
-    return Usuario.fromRow(data);
+    return Usuario.fromRow(this.#conCliente(data));
   }
 
   async listarPorRol(rol) {

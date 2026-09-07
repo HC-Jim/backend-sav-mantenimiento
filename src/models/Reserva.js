@@ -16,8 +16,6 @@ class Reserva {
     this.garantiaMonto = Number(row.garantia_monto || 0);
     this.penalidad = Number(row.penalidad || 0);
     this.montoDevuelto = Number(row.monto_devuelto || 0);
-    this.motivoCancelacion = row.motivo_cancelacion;
-    this.fechaCancelacion = row.fecha_cancelacion;
 
     // Relaciones opcionales.
     this.vehiculo = row.vehiculo || null;
@@ -46,8 +44,6 @@ class Reserva {
       garantia_monto: this.garantiaMonto,
       penalidad: this.penalidad,
       monto_devuelto: this.montoDevuelto,
-      motivo_cancelacion: this.motivoCancelacion,
-      fecha_cancelacion: this.fechaCancelacion,
       vehiculo: this.vehiculo,
       cliente: this.cliente,
       pago: this.pagos
