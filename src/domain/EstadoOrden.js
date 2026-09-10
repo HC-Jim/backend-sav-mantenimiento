@@ -54,15 +54,11 @@ const ACCIONES = Object.freeze({
     rol: Rol.MECANICO
   },
   generar_presupuesto: {
+    // El Jefe ya no autoriza: al generar el presupuesto la orden queda lista
+    // para ejecucion (se descuenta el stock en ese momento).
     desde: [Estado.INSPECCION_COMPLETA],
-    hacia: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO,
-    rol: Rol.MECANICO
-  },
-  decidir_presupuesto: {
-    desde: [Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO],
-    // Destino: PRESUPUESTO_AUTORIZADO o CERRADA_POR_RECHAZO segun la decision.
     hacia: Estado.PRESUPUESTO_AUTORIZADO,
-    rol: Rol.JEFE_LOGISTICA
+    rol: Rol.MECANICO
   },
   iniciar_mantenimiento: {
     // Se puede iniciar tras autorizar el presupuesto, o directo si la

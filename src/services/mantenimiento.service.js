@@ -134,11 +134,14 @@ class MantenimientoService {
     const costoRepuestos = items.reduce(
       (acc, it) => acc + (it.cantidad || 0) * Number(it.precio_unitario || 0), 0);
 
+    // El Jefe ya no autoriza: al generar el presupuesto se descuenta el stock
+    // y la orden queda lista para ejecucion (PRESUPUESTO_AUTORIZADO).
+    await this.#descontarStock(items);
     const presupuesto = await ordenRepo.crearPresupuesto(ordenId, {
       costo_repuestos: costoRepuestos,
       costo_mano_obra: Number(manoObra.costo || 0)
     });
-    await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });
+    await ordenRepo.actualizar(ordenId, { estado: Estado.PRESUPUESTO_AUTORIZADO });
     return presupuesto;
   }
 
@@ -187,9 +190,12 @@ class MantenimientoService {
     const necesita = inspeccion.necesita_repuestos === true;
     const items = Array.isArray(datos.items) ? datos.items : [];
     let costoRepuestos = 0;
+    let filas = [];
     if (necesita && items.length > 0) {
       const req = await ordenRepo.crearRequerimiento(ordenId);
-      const filas = await Promise.all(items.map((it) => this.#normalizarItem(it)));
+      filas = await Promise.all(items.map((it) => this.#normalizarItem(it)));
+      // El Jefe ya no autoriza: se valida y descuenta el stock al generar el presupuesto.
+      await this.#descontarStock(filas);
       await ordenRepo.agregarItems(req.id, filas);
       costoRepuestos = filas.reduce(
         (acc, f) => acc + (f.cantidad || 0) * Number(f.precio_unitario || 0), 0);
@@ -201,43 +207,12 @@ class MantenimientoService {
       costo_repuestos: costoRepuestos,
       costo_mano_obra: costoMO
     });
-    await ordenRepo.actualizar(ordenId, { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO });
-    return { estado: Estado.PENDIENTE_AUTORIZACION_PRESUPUESTO, presupuesto };
+    // Sin autorizacion del Jefe: la orden queda lista para ejecucion.
+    await ordenRepo.actualizar(ordenId, { estado: Estado.PRESUPUESTO_AUTORIZADO });
+    return { estado: Estado.PRESUPUESTO_AUTORIZADO, presupuesto };
   }
 
-  // ============ 6. AUTORIZAR / RECHAZAR PRESUPUESTO (Jefe) ============
-  async decidirPresupuesto(usuario, presupuestoId, autorizado, motivo) {
-    const presupuesto = await ordenRepo.buscarPresupuesto(presupuestoId);
-    if (!presupuesto) throw AppError.notFound('Presupuesto no encontrado');
-    const orden = await this.#ordenValidada('decidir_presupuesto', presupuesto.ordenId, usuario);
-
-    // <<include>> Generar Documentos de Costos: el Jefe evalua el costo
-    // consolidado (repuestos + mano de obra + total) antes de decidir.
-    const documentosCostos = await documentosCosto.generarParaOrden(orden.id);
-
-    const presActualizado = await ordenRepo.actualizarPresupuesto(presupuestoId, {
-      estado: autorizado ? 'AUTORIZADO' : 'RECHAZADO',
-      motivo_rechazo: autorizado ? null : motivo || null
-    });
-
-    if (autorizado) {
-      // Al aprobar el presupuesto se descuenta el stock de los repuestos.
-      const requerimiento = await ordenRepo.requerimientoDeOrden(orden.id);
-      await this.#descontarStock((requerimiento && requerimiento.repuesto_item) || []);
-      await ordenRepo.actualizar(orden.id, { estado: Estado.PRESUPUESTO_AUTORIZADO });
-    } else {
-      // Flujo alternativo: presupuesto rechazado -> orden cerrada por rechazo.
-      await ordenRepo.actualizar(orden.id, {
-        estado: Estado.CERRADA_POR_RECHAZO,
-        fecha_cierre: new Date().toISOString()
-      });
-      await vehiculoRepo.actualizarEstado(orden.vehiculoId, 'DISPONIBLE');
-    }
-    // Devuelve la decision junto con los documentos de costos evaluados.
-    return { presupuesto: presActualizado, documentos_costos: documentosCostos };
-  }
-
-  // ============ 7. INICIAR MANTENIMIENTO (Mecanico) ============
+  // ============ 6. INICIAR MANTENIMIENTO (Mecanico) ============
   async iniciarMantenimiento(usuario, ordenId) {
     await this.#ordenValidada('iniciar_mantenimiento', ordenId, usuario);
     return ordenRepo.actualizar(ordenId, {

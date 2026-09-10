@@ -181,7 +181,7 @@ class OrdenRepository {
           orden_id: ordenId,
           costo_repuestos: costo_repuestos || 0,
           costo_mano_obra: costo_mano_obra || 0,
-          estado: 'PENDIENTE'
+          estado: 'AUTORIZADO'
         })
         .select()
         .single()

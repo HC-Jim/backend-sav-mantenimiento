@@ -50,14 +50,6 @@ class MantenimientoController {
     res.status(201).json(await svc.crearOrden(req.user, req.body));
   });
 
-  decidirPresupuesto = asyncHandler(async (req, res) => {
-    const { autorizado, motivo } = req.body;
-    if (typeof autorizado !== 'boolean') {
-      throw AppError.badRequest('Debe enviar "autorizado": true|false');
-    }
-    res.json(await svc.decidirPresupuesto(req.user, req.params.presupuestoId, autorizado, motivo));
-  });
-
   decidirConformidad = asyncHandler(async (req, res) => {
     const conforme = req.body.conforme !== false; // por defecto true
     res.json(await svc.decidirConformidad(req.user, req.params.ordenId, conforme, req.body.motivo));
