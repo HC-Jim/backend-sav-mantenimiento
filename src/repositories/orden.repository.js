@@ -1,7 +1,6 @@
 const supabase = require('../config/supabase');
 const { unwrap } = require('../utils/db');
 const OrdenMantenimiento = require('../models/OrdenMantenimiento');
-const Presupuesto = require('../models/Presupuesto');
 
 /**
  * Acceso a datos de la Orden de Mantenimiento y sus documentos asociados
@@ -180,31 +179,13 @@ class OrdenRepository {
         .insert({
           orden_id: ordenId,
           costo_repuestos: costo_repuestos || 0,
-          costo_mano_obra: costo_mano_obra || 0,
-          estado: 'AUTORIZADO'
+          costo_mano_obra: costo_mano_obra || 0
         })
         .select()
         .single()
     );
   }
 
-  async buscarPresupuesto(id) {
-    const data = unwrap(
-      await supabase
-        .from('presupuesto')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle()
-    );
-    return Presupuesto.fromRow(data);
-  }
-
-  async actualizarPresupuesto(id, cambios) {
-    const data = unwrap(
-      await supabase.from('presupuesto').update(cambios).eq('id', id).select().single()
-    );
-    return Presupuesto.fromRow(data);
-  }
 
   // ---------- INFORME TECNICO ----------
   async crearInforme(ordenId, datos) {

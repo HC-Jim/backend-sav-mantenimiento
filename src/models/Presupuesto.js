@@ -1,6 +1,7 @@
 /**
  * Presupuesto de la orden (cabecera). Los repuestos viven en el
  * requerimiento (repuesto_item); el presupuesto solo guarda los totales.
+ * El Jefe ya no autoriza, por eso no lleva estado/motivo_rechazo.
  */
 class Presupuesto {
   constructor(row) {
@@ -9,17 +10,11 @@ class Presupuesto {
     this.costoRepuestos = Number(row.costo_repuestos);
     this.costoManoObra = Number(row.costo_mano_obra);
     this.total = Number(row.total);
-    this.estado = row.estado;
-    this.motivoRechazo = row.motivo_rechazo;
     this.creadoEn = row.creado_en;
   }
 
   static fromRow(row) {
     return row ? new Presupuesto(row) : null;
-  }
-
-  estaAutorizado() {
-    return this.estado === 'AUTORIZADO';
   }
 
   toJSON() {
@@ -28,9 +23,7 @@ class Presupuesto {
       orden_id: this.ordenId,
       costo_repuestos: this.costoRepuestos,
       costo_mano_obra: this.costoManoObra,
-      total: this.total,
-      estado: this.estado,
-      motivo_rechazo: this.motivoRechazo
+      total: this.total
     };
   }
 }
