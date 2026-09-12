@@ -17,7 +17,7 @@ class OrdenRepository {
           jefe_id: datos.jefe_id,
           mecanico_id: datos.mecanico_id || null,
           tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
-          descripcion: datos.descripcion,
+          indicaciones: datos.indicaciones,
           estado: 'PENDIENTE_INSPECCION'
         })
         .select()

@@ -43,9 +43,9 @@ class MantenimientoController {
 
   // ----- Jefe de Logistica -----
   crearOrden = asyncHandler(async (req, res) => {
-    const { vehiculo_id, tipo_mantenimiento_id } = req.body;
-    if (!vehiculo_id || !tipo_mantenimiento_id) {
-      throw AppError.badRequest('vehiculo_id y tipo_mantenimiento_id son obligatorios');
+    const { vehiculo_id, tipo_mantenimiento_id, mecanico_id } = req.body;
+    if (!vehiculo_id || !tipo_mantenimiento_id || !mecanico_id) {
+      throw AppError.badRequest('vehiculo_id, mecanico_id y tipo_mantenimiento_id son obligatorios');
     }
     res.status(201).json(await svc.crearOrden(req.user, req.body));
   });

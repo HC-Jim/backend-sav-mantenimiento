@@ -12,7 +12,7 @@ class OrdenMantenimiento {
     this.mecanicoId = row.mecanico_id;
     this.tipoMantenimientoId = row.tipo_mantenimiento_id;
     this.tipoServicio = row.tipo_servicio;
-    this.descripcion = row.descripcion;
+    this.indicaciones = row.indicaciones;
     this.estado = row.estado;
     this.horaInicioMant = row.hora_inicio_mant;
     this.horaFinMant = row.hora_fin_mant;
@@ -58,7 +58,7 @@ class OrdenMantenimiento {
       mecanico_id: this.mecanicoId,
       tipo_mantenimiento_id: this.tipoMantenimientoId,
       tipo_servicio: this.tipoServicio,
-      descripcion: this.descripcion,
+      indicaciones: this.indicaciones,
       estado: this.estado,
       hora_inicio_mant: this.horaInicioMant,
       hora_fin_mant: this.horaFinMant,
