@@ -18,6 +18,11 @@ class MantenimientoController {
     res.json(await svc.listarMecanicos());
   });
 
+  // Buscar Orden de Mantenimiento (consulta)
+  listarOrdenes = asyncHandler(async (_req, res) => {
+    res.json(await svc.listarOrdenes());
+  });
+
   // Registrar Orden de Mantenimiento
   crearOrden = asyncHandler(async (req, res) => {
     const { vehiculo_id, tipo_mantenimiento_id, mecanico_id } = req.body;

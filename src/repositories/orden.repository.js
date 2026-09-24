@@ -25,6 +25,19 @@ class OrdenRepository {
     return OrdenMantenimiento.fromRow(data);
   }
 
+  // Buscar Orden de Mantenimiento: lista con vehículo, tipo y mecánico.
+  async listar() {
+    const data = unwrap(
+      await supabase
+        .from('orden_mantenimiento')
+        .select('*, vehiculo:vehiculo_id (placa, marca, modelo), ' +
+          'tipo_mantenimiento:tipo_mantenimiento_id (nombre), ' +
+          'mecanico:usuario!orden_mantenimiento_mecanico_id_fkey (nombre)')
+        .order('fecha_creacion', { ascending: false })
+    );
+    return data.map(OrdenMantenimiento.fromRow);
+  }
+
   // ---------- Catálogo de tipos de mantenimiento ----------
   async listarTiposMantenimiento() {
     return unwrap(

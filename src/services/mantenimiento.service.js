@@ -21,6 +21,11 @@ class MantenimientoService {
     return usuarioRepo.listarMecanicosDetalle();
   }
 
+  // Buscar Orden de Mantenimiento (consulta de órdenes registradas).
+  async listarOrdenes() {
+    return ordenRepo.listar();
+  }
+
   // Registrar Orden de Mantenimiento (Jefe de Logística).
   async crearOrden(usuario, datos) {
     if (usuario.rol !== Rol.JEFE_LOGISTICA) {

@@ -17,6 +17,7 @@ router.get('/tipos-mantenimiento', c.listarTiposMantenimiento);            // ca
 router.get('/mecanicos', exigirRol(Rol.JEFE_LOGISTICA), c.listarMecanicos); // «include» Buscar Mecanico
 
 // ---- JEFE DE LOGISTICA ----
+router.get('/ordenes', exigirRol(Rol.JEFE_LOGISTICA), c.listarOrdenes);     // Buscar Orden de Mantenimiento
 router.post('/ordenes', exigirRol(Rol.JEFE_LOGISTICA), c.crearOrden);       // Registrar Orden de Mantenimiento
 
 module.exports = router;
