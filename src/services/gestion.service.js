@@ -18,24 +18,7 @@ class GestionService {
     return vehiculoRepo.listar();
   }
 
-  crearVehiculo(datos) {
-    if (!datos.placa) throw AppError.badRequest('La placa es obligatoria');
-    return vehiculoRepo.crear({
-      sku: datos.sku || null,
-      placa: datos.placa,
-      marca: datos.marca,
-      modelo: datos.modelo,
-      anio: datos.anio,
-      color: datos.color,
-      categoria: datos.categoria || null,
-      kilometraje: datos.kilometraje || 0,
-      fecha_ultimo_mantenimiento: datos.fecha_ultimo_mantenimiento || null,
-      fecha_proximo_mantenimiento: datos.fecha_proximo_mantenimiento || null,
-      estado: datos.estado || 'DISPONIBLE'
-    });
-  }
-
-  /** Editar datos del vehiculo (Gestion de Vehiculos): sin precios. */
+  /** Editar datos del vehiculo (sin precios). */
   async actualizarVehiculo(id, datos) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
     return vehiculoRepo.actualizar(id, {
@@ -58,11 +41,6 @@ class GestionService {
       throw AppError.badRequest('El precio y la garantia no pueden ser negativos');
     }
     return vehiculoRepo.actualizar(id, { precio_normal: precio, garantia });
-  }
-
-  async eliminarVehiculo(id) {
-    await this.#existe(vehiculoRepo, id, 'Vehiculo');
-    return vehiculoRepo.eliminar(id);
   }
 
   // ---------- CLIENTES ----------

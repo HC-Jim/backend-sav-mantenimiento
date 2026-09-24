@@ -13,11 +13,10 @@ const admin = exigirRol(Rol.ADMINISTRADOR);
 const clientes = admin;
 
 // ---- Vehiculos (Mantener Vehiculo + precio por vehiculo) ----
+// Solo edición: no se crean ni eliminan vehículos desde el sistema.
 router.get('/vehiculos', admin, c.listarVehiculos);
-router.post('/vehiculos', admin, c.crearVehiculo);
-router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);          // Gestion de Vehiculos (datos)
-router.patch('/vehiculos/:id/precio', admin, c.actualizarPrecioVehiculo); // Catalogo de Precios (precio)
-router.delete('/vehiculos/:id', admin, c.eliminarVehiculo);
+router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);          // Editar datos del vehículo
+router.patch('/vehiculos/:id/precio', admin, c.actualizarPrecioVehiculo); // Precio de alquiler + garantía
 
 // ---- Clientes (Mantener Cliente / CRUD Cliente) ----
 router.get('/clientes', clientes, c.listarClientes);
