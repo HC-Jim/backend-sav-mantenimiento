@@ -1,9 +1,7 @@
 const reservaRepo = require('../repositories/reserva.repository');
 const vehiculoRepo = require('../repositories/vehiculo.repository');
-const busqueda = require('./busqueda.service');          // <<include>> Buscar Vehiculo
-const comprobante = require('./comprobante.service');     // <<include>> Emitir Comprobante
-const precioService = require('./precio.service');        // precio por dia (normal/campania)
-const PoliticasAlquiler = require('../domain/PoliticasAlquiler');
+const busqueda = require('./busqueda.service');          // «include» Buscar Vehiculo
+const comprobante = require('./comprobante.service');     // Emitir Comprobante (parte del pago)
 const { EstadoReserva, MaquinaReserva } = require('../domain/EstadoReserva');
 const { Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
@@ -46,21 +44,19 @@ class ReservaService {
     if (!vehiculo_id) throw AppError.badRequest('vehiculo_id es obligatorio');
     this.#validarFechas(fecha_inicio, fecha_fin);
 
-    const vehiculo = await busqueda.buscarVehiculo(vehiculo_id); // <<include>> Buscar Vehiculo
+    const vehiculo = await busqueda.buscarVehiculo(vehiculo_id); // «include» Buscar Vehiculo
     const disp = await this.verificarDisponibilidad(vehiculo_id, fecha_inicio, fecha_fin);
     if (!disp.disponible) throw AppError.conflict(disp.motivo);
 
-    const dias = PoliticasAlquiler.diasEntre(fecha_inicio, fecha_fin);
-    const { tarifa } = precioService.tarifaPara(vehiculo, dias); // precio normal/campania
-
+    // Precio de alquiler fijo por auto y garantia fija por auto.
     return reservaRepo.crear({
       cliente_id: clienteId,
       vehiculo_id,
       fecha_inicio,
       fecha_fin,
       estado: EstadoReserva.POR_PAGAR,
-      monto_total_estimado: tarifa * dias,
-      garantia_monto: tarifa * PoliticasAlquiler.FACTOR_GARANTIA
+      monto_total_estimado: vehiculo.precioAlquiler,
+      garantia_monto: vehiculo.garantia
     });
   }
 

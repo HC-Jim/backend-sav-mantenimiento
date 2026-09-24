@@ -49,16 +49,15 @@ class GestionService {
     });
   }
 
-  /** Editar el precio del vehiculo (Catalogo de Precios): regular/normal/campania. */
+  /** Editar el precio de alquiler (fijo) y la garantia del vehiculo. */
   async actualizarPrecioVehiculo(id, datos) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
-    const p = this.#validarPrecios(datos);
-    return vehiculoRepo.actualizar(id, {
-      precio_regular: p.regular,
-      precio_normal: p.normal,
-      precio_campania: p.campania,
-      dias_min_campania: p.diasMin
-    });
+    const precio = Number(datos.precio_normal || 0);
+    const garantia = Number(datos.garantia || 0);
+    if (precio < 0 || garantia < 0) {
+      throw AppError.badRequest('El precio y la garantia no pueden ser negativos');
+    }
+    return vehiculoRepo.actualizar(id, { precio_normal: precio, garantia });
   }
 
   async eliminarVehiculo(id) {
@@ -150,18 +149,6 @@ class GestionService {
   async eliminarSeguro(id) {
     await this.#existe(seguroRepo, id, 'Seguro');
     return seguroRepo.eliminar(id);
-  }
-
-  /** Valida y normaliza los precios: el regular debe ser mayor al normal. */
-  #validarPrecios(datos) {
-    const regular = Number(datos.precio_regular || 0);
-    const normal = Number(datos.precio_normal || 0);
-    const campania = Number(datos.precio_campania || 0);
-    const diasMin = Number(datos.dias_min_campania || 7);
-    if (regular <= normal) {
-      throw AppError.badRequest('El precio regular debe ser mayor al precio normal');
-    }
-    return { regular, normal, campania, diasMin };
   }
 
   // ---------- helper ----------
