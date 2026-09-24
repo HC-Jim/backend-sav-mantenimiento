@@ -38,16 +38,6 @@ class ReservaRepository {
     return data.map(Reserva.fromRow);
   }
 
-  async listarTodas() {
-    const data = unwrap(
-      await supabase
-        .from('reserva')
-        .select('*, vehiculo:vehiculo_id (id, placa, marca, modelo), cliente:cliente_id (razon_social)')
-        .order('fecha_solicitud', { ascending: false })
-    );
-    return data.map(Reserva.fromRow);
-  }
-
   async actualizar(id, cambios) {
     const data = unwrap(
       await supabase.from('reserva').update(cambios).eq('id', id).select().single()
@@ -71,34 +61,13 @@ class ReservaRepository {
     );
   }
 
-  // ---------- Alquiler / Pago / Comprobante ----------
-  async crearAlquiler(datos) {
-    return unwrap(await supabase.from('alquiler').insert(datos).select().single());
-  }
-
+  // ---------- Pago / Comprobante (del Registrar Pago) ----------
   async crearPago(datos) {
     return unwrap(await supabase.from('pago').insert(datos).select().single());
   }
 
   async crearComprobante(datos) {
     return unwrap(await supabase.from('comprobante').insert(datos).select().single());
-  }
-
-  /** Pagos de una reserva (garantia, alquiler, devolucion). */
-  async pagosDeReserva(reservaId) {
-    return unwrap(
-      await supabase.from('pago').select('*').eq('reserva_id', reservaId)
-    );
-  }
-
-  /** Comprobantes de una reserva (via sus pagos). */
-  async comprobantesDeReserva(reservaId) {
-    const pagos = await this.pagosDeReserva(reservaId);
-    const ids = pagos.map((p) => p.id);
-    if (ids.length === 0) return [];
-    return unwrap(
-      await supabase.from('comprobante').select('*').in('pago_id', ids)
-    );
   }
 }
 

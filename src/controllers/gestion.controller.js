@@ -23,13 +23,11 @@ class GestionController {
   listarUsuarios = asyncHandler(async (_req, res) => res.json(await svc.listarUsuarios()));
   crearUsuario = asyncHandler(async (req, res) => res.status(201).json(await svc.crearUsuario(req.body)));
 
-  // Seguros
+  // Seguros (Registrar Seguro)
   listarSeguros = asyncHandler(async (_req, res) => res.json(await svc.listarSeguros()));
-  segurosPorVencer = asyncHandler(async (req, res) => res.json(await svc.segurosPorVencer(req.query.dias)));
   crearSeguro = asyncHandler(async (req, res) => res.status(201).json(await svc.crearSeguro(req.body)));
   actualizarSeguro = asyncHandler(async (req, res) => res.json(await svc.actualizarSeguro(req.params.id, req.body)));
   eliminarSeguro = asyncHandler(async (req, res) => res.json(await svc.eliminarSeguro(req.params.id)));
-  renovarSeguro = asyncHandler(async (req, res) => res.status(201).json(await svc.renovarSeguro(req.params.id, req.body)));
 }
 
 module.exports = new GestionController();

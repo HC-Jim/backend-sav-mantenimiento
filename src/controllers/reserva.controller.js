@@ -29,29 +29,13 @@ class ReservaController {
     res.json(await svc.misReservas(req.user));
   });
 
-  listarTodas = asyncHandler(async (_req, res) => {
-    res.json(await svc.listarTodas());
-  });
-
   verReserva = asyncHandler(async (req, res) => {
     res.json(await svc.obtenerReserva(req.user, req.params.reservaId));
   });
 
+  // Registrar Pago de Orden de Reserva (emite el comprobante como parte del pago).
   pagarOrdenReserva = asyncHandler(async (req, res) => {
     res.json(await svc.pagarOrdenReserva(req.user, req.params.reservaId, req.body));
-  });
-
-  // ----- Acciones del Cajero -----
-  devolverGarantia = asyncHandler(async (req, res) => {
-    res.json(await svc.devolverGarantia(req.user, req.params.reservaId, req.body));
-  });
-
-  emitirComprobante = asyncHandler(async (req, res) => {
-    res.status(201).json(await svc.emitirComprobante(req.user, req.params.reservaId));
-  });
-
-  listarComprobantes = asyncHandler(async (req, res) => {
-    res.json(await svc.listarComprobantes(req.user, req.params.reservaId));
   });
 }
 

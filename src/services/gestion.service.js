@@ -129,10 +129,6 @@ class GestionService {
     return seguroRepo.listar();
   }
 
-  segurosPorVencer(dias) {
-    return seguroRepo.porVencer(dias ? Number(dias) : 30);
-  }
-
   crearSeguro(datos) {
     if (!datos.vehiculo_id) throw AppError.badRequest('vehiculo_id es obligatorio');
     return seguroRepo.crear({
@@ -154,27 +150,6 @@ class GestionService {
   async eliminarSeguro(id) {
     await this.#existe(seguroRepo, id, 'Seguro');
     return seguroRepo.eliminar(id);
-  }
-
-  /**
-   * Registrar Renovación de Seguro (CUS - Torres): a partir de una poliza
-   * existente, crea una nueva vigencia para el mismo vehiculo con nuevas
-   * fechas/numero de poliza.
-   */
-  async renovarSeguro(id, datos) {
-    const anterior = await this.#existe(seguroRepo, id, 'Seguro');
-    if (!datos.fecha_emision || !datos.fecha_vencimiento) {
-      throw AppError.badRequest('fecha_emision y fecha_vencimiento son obligatorias para renovar');
-    }
-    return seguroRepo.crear({
-      vehiculo_id: anterior.vehiculoId,
-      tipo_seguro: datos.tipo_seguro || anterior.tipoSeguro,
-      num_poliza: datos.num_poliza || anterior.numPoliza,
-      aseguradora_entidad: datos.aseguradora_entidad || anterior.aseguradoraEntidad,
-      fecha_emision: datos.fecha_emision,
-      fecha_vencimiento: datos.fecha_vencimiento,
-      archivo_adjunto: datos.archivo_adjunto || null
-    });
   }
 
   /** Valida y normaliza los precios: el regular debe ser mayor al normal. */
