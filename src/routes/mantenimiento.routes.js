@@ -5,31 +5,18 @@ const { Rol } = require('../domain/EstadoOrden');
 
 const router = Router();
 
-// Todas las rutas del proceso requieren autenticacion.
+// Todas las rutas requieren autenticacion.
 router.use(autenticar);
 
-// ---- Consultas (ambos roles) ----
-router.get('/ordenes', c.listarOrdenes);                 // ?estado=... (opcional)
-router.get('/ordenes/:ordenId', c.verOrden);             // Mecanico "recibe la orden"
-router.get('/ordenes/:ordenId/documentos-costos', c.documentosDeCostos); // <<include>> Generar Documentos de Costos
-router.get('/vehiculos/por-mantener', c.listarVehiculosPorMantener);
-router.get('/repuestos', c.listarCatalogo);              // catalogo de repuestos
-router.get('/tipos-mantenimiento', c.listarTiposMantenimiento); // catalogo de tipos de mantenimiento
-router.patch('/repuestos/:repuestoId/comprar', exigirRol(Rol.JEFE_LOGISTICA), c.comprarRepuesto); // reponer stock (Jefe)
-router.get('/mecanicos', exigirRol(Rol.JEFE_LOGISTICA), c.listarMecanicos); // para asignar OM
+// El proceso de mantenimiento se reduce a "Registrar Orden de Mantenimiento"
+// (Jefe de Logistica), que «incluye» Buscar Vehiculo y Buscar Mecanico.
+// Se eliminaron: inspeccion, presupuesto, ejecucion, informe, conformidad y repuestos.
+
+// ---- Catalogos / busquedas de apoyo ----
+router.get('/tipos-mantenimiento', c.listarTiposMantenimiento);            // catalogo de tipos
+router.get('/mecanicos', exigirRol(Rol.JEFE_LOGISTICA), c.listarMecanicos); // «include» Buscar Mecanico
 
 // ---- JEFE DE LOGISTICA ----
-router.post('/ordenes', exigirRol(Rol.JEFE_LOGISTICA), c.crearOrden);
-router.patch('/ordenes/:ordenId/conformidad', exigirRol(Rol.JEFE_LOGISTICA), c.decidirConformidad);
-
-// ---- MECANICO ----
-router.post('/ordenes/:ordenId/inspeccion', exigirRol(Rol.MECANICO), c.registrarInspeccion);
-router.post('/ordenes/:ordenId/inspeccion-completa', exigirRol(Rol.MECANICO), c.procesarInspeccion);
-router.post('/ordenes/:ordenId/requerimientos', exigirRol(Rol.MECANICO), c.crearRequerimiento);
-router.post('/ordenes/:ordenId/mano-obra', exigirRol(Rol.MECANICO), c.registrarManoObra);
-router.post('/ordenes/:ordenId/presupuesto', exigirRol(Rol.MECANICO), c.generarPresupuesto);
-router.patch('/ordenes/:ordenId/iniciar', exigirRol(Rol.MECANICO), c.iniciarMantenimiento);
-router.patch('/ordenes/:ordenId/finalizar', exigirRol(Rol.MECANICO), c.finalizarMantenimiento);
-router.post('/ordenes/:ordenId/informe', exigirRol(Rol.MECANICO), c.generarInforme);
+router.post('/ordenes', exigirRol(Rol.JEFE_LOGISTICA), c.crearOrden);       // Registrar Orden de Mantenimiento
 
 module.exports = router;

@@ -29,11 +29,10 @@ router.delete('/clientes/:id', clientes, c.eliminarCliente);
 router.get('/usuarios', admin, c.listarUsuarios);
 router.post('/usuarios', admin, c.crearUsuario);
 
-// ---- Seguros / Polizas (CUS017 / CUS018) ----
+// ---- Seguros / Polizas (Registrar Seguro) ----
+// Se eliminó "Renovar Seguro" del alcance.
 router.get('/seguros', admin, c.listarSeguros);
-router.get('/seguros/por-vencer', admin, c.segurosPorVencer);
 router.post('/seguros', admin, c.crearSeguro);
-router.post('/seguros/:id/renovar', admin, c.renovarSeguro);   // Registrar Renovacion de Seguro
 router.patch('/seguros/:id', admin, c.actualizarSeguro);
 router.delete('/seguros/:id', admin, c.eliminarSeguro);
 
