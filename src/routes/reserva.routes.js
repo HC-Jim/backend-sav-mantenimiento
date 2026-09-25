@@ -17,6 +17,7 @@ router.get('/disponibilidad', c.disponibilidad);      // ?vehiculo_id=&fecha_ini
 router.post('/reservas', exigirRol(Rol.CLIENTE), c.generarOrdenReserva);            // Generar Orden de Reserva -> POR_PAGAR
 router.get('/reservas/mias', exigirRol(Rol.CLIENTE), c.misReservas);                // «include» Buscar Orden de Reserva
 router.get('/reservas/:reservaId', c.verReserva);
+router.post('/reservas/:reservaId/cupon', exigirRol(Rol.CLIENTE), c.validarCupon);        // Aplicar Cupon (valida y devuelve descuento)
 router.patch('/reservas/:reservaId/pagar', exigirRol(Rol.CLIENTE), c.pagarOrdenReserva); // Registrar Pago de Orden de Reserva -> RESERVADO («extend» Emitir Comprobante)
 
 module.exports = router;

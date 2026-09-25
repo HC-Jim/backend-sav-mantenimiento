@@ -12,11 +12,15 @@ router.use(autenticar);
 const admin = exigirRol(Rol.ADMINISTRADOR);
 const clientes = admin;
 
-// ---- Vehiculos (Mantener Vehiculo + precio por vehiculo) ----
-// Solo edición: no se crean ni eliminan vehículos desde el sistema.
+// ---- Vehiculos (CRUD unificado: datos + precios + historial) ----
 router.get('/vehiculos', admin, c.listarVehiculos);
-router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);          // Editar datos del vehículo
+router.post('/vehiculos', admin, c.crearVehiculo);                        // Crear vehículo (SKU automático)
+router.get('/vehiculos/:id/precios', admin, c.historialPrecios);          // Historial + último/promedio/variación
+router.patch('/vehiculos/:id', admin, c.actualizarVehiculo);             // Editar datos del vehículo
 router.patch('/vehiculos/:id/precio', admin, c.actualizarPrecioVehiculo); // Precio de alquiler + garantía
+
+// ---- Cupones (tabla de descuentos) ----
+router.get('/cupones', admin, c.listarCupones);
 
 // ---- Clientes (Mantener Cliente / CRUD Cliente) ----
 router.get('/clientes', clientes, c.listarClientes);

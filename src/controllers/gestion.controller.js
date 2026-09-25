@@ -6,10 +6,15 @@ const asyncHandler = require('../utils/asyncHandler');
  * CRUD de vehiculos, clientes y seguros.
  */
 class GestionController {
-  // Vehiculos (solo edición)
+  // Vehiculos (CRUD unificado: datos + precios + historial)
   listarVehiculos = asyncHandler(async (_req, res) => res.json(await svc.listarVehiculos()));
+  crearVehiculo = asyncHandler(async (req, res) => res.status(201).json(await svc.crearVehiculo(req.body)));
   actualizarVehiculo = asyncHandler(async (req, res) => res.json(await svc.actualizarVehiculo(req.params.id, req.body)));
   actualizarPrecioVehiculo = asyncHandler(async (req, res) => res.json(await svc.actualizarPrecioVehiculo(req.params.id, req.body)));
+  historialPrecios = asyncHandler(async (req, res) => res.json(await svc.historialPrecios(req.params.id)));
+
+  // Cupones
+  listarCupones = asyncHandler(async (_req, res) => res.json(await svc.listarCupones()));
 
   // Clientes
   listarClientes = asyncHandler(async (_req, res) => res.json(await svc.listarClientes()));

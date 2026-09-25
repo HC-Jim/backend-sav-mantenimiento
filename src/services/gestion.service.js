@@ -2,6 +2,7 @@ const vehiculoRepo = require('../repositories/vehiculo.repository');
 const clienteRepo = require('../repositories/cliente.repository');
 const seguroRepo = require('../repositories/seguro.repository');
 const usuarioRepo = require('../repositories/usuario.repository');
+const cuponRepo = require('../repositories/cupon.repository');
 const Usuario = require('../models/Usuario');
 const { Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
@@ -13,16 +14,41 @@ const AppError = require('../utils/AppError');
  *  - Registrar Polizas / Seguros + alerta de vencimiento
  */
 class GestionService {
-  // ---------- VEHICULOS ----------
+  // ---------- VEHICULOS (CRUD unificado: datos + precios) ----------
   listarVehiculos() {
     return vehiculoRepo.listar();
   }
 
-  /** Editar datos del vehiculo (sin precios). */
+  /** Crear un vehiculo nuevo con sus datos y su precio/garantia iniciales.
+   *  El SKU se genera automaticamente (no editable). */
+  async crearVehiculo(datos) {
+    if (!datos.placa) throw AppError.badRequest('La placa es obligatoria');
+    const precio = Number(datos.precio_normal || 0);
+    const garantia = Number(datos.garantia || 0);
+    if (precio < 0 || garantia < 0) {
+      throw AppError.badRequest('El precio y la garantia no pueden ser negativos');
+    }
+    const sku = await vehiculoRepo.siguienteSku();
+    const vehiculo = await vehiculoRepo.crear({
+      sku,
+      placa: datos.placa,
+      marca: datos.marca,
+      modelo: datos.modelo,
+      anio: datos.anio,
+      color: datos.color,
+      categoria: datos.categoria,
+      precio_normal: precio,
+      garantia,
+      estado: 'DISPONIBLE'
+    });
+    await vehiculoRepo.registrarPrecio(vehiculo.id, precio, garantia);
+    return vehiculo;
+  }
+
+  /** Editar datos del vehiculo (sin precios). El SKU no se modifica. */
   async actualizarVehiculo(id, datos) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
     return vehiculoRepo.actualizar(id, {
-      sku: datos.sku,
       placa: datos.placa,
       marca: datos.marca,
       modelo: datos.modelo,
@@ -32,7 +58,7 @@ class GestionService {
     });
   }
 
-  /** Editar el precio de alquiler (fijo) y la garantia del vehiculo. */
+  /** Editar el precio de alquiler (fijo) y la garantia; deja traza en el historial. */
   async actualizarPrecioVehiculo(id, datos) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
     const precio = Number(datos.precio_normal || 0);
@@ -40,7 +66,24 @@ class GestionService {
     if (precio < 0 || garantia < 0) {
       throw AppError.badRequest('El precio y la garantia no pueden ser negativos');
     }
-    return vehiculoRepo.actualizar(id, { precio_normal: precio, garantia });
+    const actualizado = await vehiculoRepo.actualizar(id, { precio_normal: precio, garantia });
+    await vehiculoRepo.registrarPrecio(id, precio, garantia);
+    return actualizado;
+  }
+
+  /** Historial de precios + estadisticas (ultimo, promedio, variacion). */
+  async historialPrecios(id) {
+    await this.#existe(vehiculoRepo, id, 'Vehiculo');
+    const historial = await vehiculoRepo.historialPrecios(id);
+    const precios = historial.map((h) => Number(h.precio_normal));
+    const ultimo = precios.length ? precios[precios.length - 1] : 0;
+    const primero = precios.length ? precios[0] : 0;
+    const promedio = precios.length
+      ? Math.round((precios.reduce((a, b) => a + b, 0) / precios.length) * 100) / 100
+      : 0;
+    const variacion = Math.round((ultimo - primero) * 100) / 100;
+    const variacionPct = primero > 0 ? Math.round(((ultimo - primero) / primero) * 10000) / 100 : 0;
+    return { historial, ultimo, promedio, variacion, variacion_pct: variacionPct, cambios: historial.length };
   }
 
   // ---------- CLIENTES ----------
@@ -115,8 +158,17 @@ class GestionService {
       aseguradora_entidad: datos.aseguradora_entidad,
       fecha_emision: datos.fecha_emision || null,
       fecha_vencimiento: datos.fecha_vencimiento || null,
+      suma_asegurada: datos.suma_asegurada != null ? Number(datos.suma_asegurada) : null,
+      prima: datos.prima != null ? Number(datos.prima) : null,
+      cobertura: datos.cobertura || null,
+      observaciones: datos.observaciones || null,
       archivo_adjunto: datos.archivo_adjunto || null
     });
+  }
+
+  // ---------- CUPONES ----------
+  listarCupones() {
+    return cuponRepo.listar();
   }
 
   async actualizarSeguro(id, cambios) {

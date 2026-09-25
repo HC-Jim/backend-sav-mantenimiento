@@ -2,6 +2,7 @@ const reservaRepo = require('../repositories/reserva.repository');
 const vehiculoRepo = require('../repositories/vehiculo.repository');
 const busqueda = require('./busqueda.service');          // «include» Buscar Vehiculo
 const comprobante = require('./comprobante.service');     // Emitir Comprobante (parte del pago)
+const cuponService = require('./cupon.service');          // «extend» Aplicar Cupon
 const { EstadoReserva, MaquinaReserva } = require('../domain/EstadoReserva');
 const { Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
@@ -73,28 +74,73 @@ class ReservaService {
     return reserva;
   }
 
+  // ============ Aplicar Cupon (consulta previa al pago) ============
+  async validarCupon(usuario, reservaId, codigo) {
+    const reserva = await this.#reservaValidada('pagar_orden', usuario, reservaId);
+    return cuponService.validar(codigo, reserva.montoTotalEstimado);
+  }
+
   // ============ 2. PAGAR ORDEN DE RESERVA (Cliente) ============
   // Un solo paso: paga la garantia y el alquiler; la reserva queda RESERVADO
-  // y el vehiculo ALQUILADO.
-  async pagarOrdenReserva(usuario, reservaId, { metodo } = {}) {
+  // y el vehiculo ALQUILADO. Admite pago con Tarjeta (credito/debito, cuotas)
+  // o Yape, y un cupon de descuento aplicado al alquiler.
+  async pagarOrdenReserva(usuario, reservaId, datos = {}) {
     const reserva = await this.#reservaValidada('pagar_orden', usuario, reservaId);
+    const {
+      metodo, tipo_tarjeta, cuotas, tarjeta = {}, yape = {}, cupon_codigo
+    } = datos;
     const met = metodo || 'TARJETA';
 
+    const alquilerBase = Number(reserva.montoTotalEstimado);
+    const garantia = Number(reserva.garantiaMonto);
+
+    // «extend» Aplicar Cupon (opcional): descuenta del alquiler.
+    let cupon = null;
+    let descuento = 0;
+    if (cupon_codigo) {
+      cupon = await cuponService.validar(cupon_codigo, alquilerBase);
+      descuento = cupon.descuento;
+    }
+    const alquilerFinal = Math.max(0, Math.round((alquilerBase - descuento) * 100) / 100);
+
+    // Datos del medio de pago (nunca se guarda el numero completo ni el CVV).
+    const datosMedio = met === 'YAPE'
+      ? { yape_celular: yape.celular || null, yape_operacion: yape.operacion || null }
+      : {
+          tipo_tarjeta: tipo_tarjeta || 'DEBITO',
+          cuotas: (tipo_tarjeta === 'CREDITO') ? Number(cuotas || 1) : null,
+          tarjeta_ultimos4: tarjeta.ultimos4 || null,
+          tarjeta_marca: tarjeta.marca || null
+        };
+
     const pagoGarantia = await reservaRepo.crearPago({
-      reserva_id: reserva.id, monto: reserva.garantiaMonto,
-      concepto: 'GARANTIA', metodo: met, estado: 'PAGADO'
+      reserva_id: reserva.id, monto: garantia,
+      concepto: 'GARANTIA', metodo: met, estado: 'PAGADO', ...datosMedio
     });
     const pagoAlquiler = await reservaRepo.crearPago({
-      reserva_id: reserva.id, monto: reserva.montoTotalEstimado,
-      concepto: 'ALQUILER', metodo: met, estado: 'PAGADO'
+      reserva_id: reserva.id, monto: alquilerFinal,
+      concepto: 'ALQUILER', metodo: met, estado: 'PAGADO',
+      descuento, cupon_id: cupon ? cupon.id : null, ...datosMedio
     });
+
+    // Marca el cupon como usado (una sola vez).
+    if (cupon) await cuponService.marcarUsado(cupon.id);
+
     // <<include>> Emitir Comprobante (por el total pagado)
-    const total = Number(reserva.garantiaMonto) + Number(reserva.montoTotalEstimado);
+    const total = Math.round((alquilerFinal + garantia) * 100) / 100;
     const comp = await comprobante.emitir({ pago_id: pagoAlquiler.id, monto_total: total });
 
     const actualizada = await reservaRepo.actualizar(reserva.id, { estado: EstadoReserva.RESERVADO });
     await vehiculoRepo.actualizarEstado(reserva.vehiculoId, 'ALQUILADO');
-    return { reserva: actualizada, pago_garantia: pagoGarantia, pago_alquiler: pagoAlquiler, comprobante: comp };
+    return {
+      reserva: actualizada,
+      pago_garantia: pagoGarantia,
+      pago_alquiler: pagoAlquiler,
+      comprobante: comp,
+      cupon,
+      descuento,
+      total
+    };
   }
 
   // ============ Helpers privados ============

@@ -33,6 +33,11 @@ class ReservaController {
     res.json(await svc.obtenerReserva(req.user, req.params.reservaId));
   });
 
+  // Aplicar Cupon: valida el código para la reserva y devuelve el descuento.
+  validarCupon = asyncHandler(async (req, res) => {
+    res.json(await svc.validarCupon(req.user, req.params.reservaId, req.body.codigo));
+  });
+
   // Registrar Pago de Orden de Reserva (emite el comprobante como parte del pago).
   pagarOrdenReserva = asyncHandler(async (req, res) => {
     res.json(await svc.pagarOrdenReserva(req.user, req.params.reservaId, req.body));

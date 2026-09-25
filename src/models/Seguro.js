@@ -10,6 +10,10 @@ class Seguro {
     this.aseguradoraEntidad = row.aseguradora_entidad;
     this.fechaEmision = row.fecha_emision;
     this.fechaVencimiento = row.fecha_vencimiento;
+    this.sumaAsegurada = row.suma_asegurada;
+    this.prima = row.prima;
+    this.cobertura = row.cobertura;
+    this.observaciones = row.observaciones;
     this.archivoAdjunto = row.archivo_adjunto;
     this.creadoEn = row.creado_en;
     this.vehiculo = row.vehiculo || null;
@@ -35,6 +39,10 @@ class Seguro {
       aseguradora_entidad: this.aseguradoraEntidad,
       fecha_emision: this.fechaEmision,
       fecha_vencimiento: this.fechaVencimiento,
+      suma_asegurada: this.sumaAsegurada,
+      prima: this.prima,
+      cobertura: this.cobertura,
+      observaciones: this.observaciones,
       archivo_adjunto: this.archivoAdjunto,
       dias_para_vencer: this.diasParaVencer(),
       vehiculo: this.vehiculo
