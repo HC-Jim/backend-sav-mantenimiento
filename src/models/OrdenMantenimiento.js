@@ -3,19 +3,25 @@
  */
 class OrdenMantenimiento {
   constructor(row) {
+    // El detalle (mecánico, tipo, indicaciones) vive en detalle_orden_mantenimiento.
+    // Se aplana en la respuesta para no cambiar el contrato con el frontend.
+    const det = Array.isArray(row.detalle) ? (row.detalle[0] || null) : (row.detalle || null);
+
     this.id = row.id;
     this.vehiculoId = row.vehiculo_id;
     this.jefeId = row.jefe_id;
-    this.mecanicoId = row.mecanico_id;
-    this.tipoMantenimientoId = row.tipo_mantenimiento_id;
-    this.indicaciones = row.indicaciones;
     this.estado = row.estado;
     this.fechaCreacion = row.fecha_creacion;
 
+    // Datos del detalle (aplanados).
+    this.mecanicoId = det?.mecanico_id ?? null;
+    this.tipoMantenimientoId = det?.tipo_mantenimiento_id ?? null;
+    this.indicaciones = det?.indicaciones ?? null;
+
     // Relaciones opcionales (cuando el repositorio las incluye en el select).
     this.vehiculo = row.vehiculo || null;
-    this.tipoMantenimiento = row.tipo_mantenimiento || null;
-    this.mecanico = row.mecanico || null;
+    this.tipoMantenimiento = det?.tipo_mantenimiento || null;
+    this.mecanico = det?.mecanico || null;
   }
 
   static fromRow(row) {

@@ -7,7 +7,8 @@ const OrdenMantenimiento = require('../models/OrdenMantenimiento');
  * Alcance vigente: registrar la orden y consultar el catálogo de tipos.
  */
 class OrdenRepository {
-  // Registra la cabecera (con sus campos) y, además, el detalle de la orden.
+  // Registra la cabecera (vehículo, jefe, estado) y su detalle
+  // (mecánico, tipo, indicaciones) — patrón cabecera/detalle.
   async crear(datos) {
     // 17. Registra la orden (cabecera) -> 18. retorna número de orden
     const cabecera = unwrap(
@@ -16,32 +17,36 @@ class OrdenRepository {
         .insert({
           vehiculo_id: datos.vehiculo_id,
           jefe_id: datos.jefe_id,
-          mecanico_id: datos.mecanico_id || null,
-          tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
-          indicaciones: datos.indicaciones,
           estado: 'PENDIENTE_INSPECCION'
         })
         .select()
         .single()
     );
-    // 19. Registra también el detalle de la orden (CE_DetalleOrdenMantenimiento)
-    await supabase.from('detalle_orden_mantenimiento').insert({
-      orden_id: cabecera.id,
-      mecanico_id: datos.mecanico_id || null,
-      tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
-      indicaciones: datos.indicaciones
-    });
-    return OrdenMantenimiento.fromRow(cabecera);
+    // 19. Registra el detalle de la orden (CE_DetalleOrdenMantenimiento)
+    const detalle = unwrap(
+      await supabase
+        .from('detalle_orden_mantenimiento')
+        .insert({
+          orden_id: cabecera.id,
+          mecanico_id: datos.mecanico_id || null,
+          tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
+          indicaciones: datos.indicaciones
+        })
+        .select()
+        .single()
+    );
+    return OrdenMantenimiento.fromRow({ ...cabecera, detalle: [detalle] });
   }
 
-  // Buscar Orden de Mantenimiento: lista con vehículo, tipo y mecánico.
+  // Buscar Orden de Mantenimiento: cabecera + detalle (vehículo, tipo, mecánico).
   async listar() {
     const data = unwrap(
       await supabase
         .from('orden_mantenimiento')
         .select('*, vehiculo:vehiculo_id (placa, marca, modelo), ' +
+          'detalle:detalle_orden_mantenimiento (indicaciones, ' +
           'tipo_mantenimiento:tipo_mantenimiento_id (nombre), ' +
-          'mecanico:usuario!orden_mantenimiento_mecanico_id_fkey (nombre)')
+          'mecanico:usuario!detalle_orden_mantenimiento_mecanico_id_fkey (nombre))')
         .order('fecha_creacion', { ascending: false })
     );
     return data.map(OrdenMantenimiento.fromRow);

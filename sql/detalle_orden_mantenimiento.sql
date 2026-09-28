@@ -1,7 +1,9 @@
 -- ============================================================
 -- Patrón Cabecera/Detalle para la Orden de Mantenimiento.
---   * Cabecera (orden_mantenimiento): vehículo, jefe, estado, fecha.
+--   * Cabecera (orden_mantenimiento): vehículo, jefe, estado, fechas.
 --   * Detalle  (detalle_orden_mantenimiento): mecánico, tipo, indicaciones.
+-- El detalle incluye los CU «Buscar Mecánico» y «Buscar Vehículo» al registrar.
+-- Idempotente: se puede correr varias veces sin error.
 -- Ejecutar en el SQL Editor de Supabase.
 -- ============================================================
 
@@ -14,12 +16,19 @@ create table if not exists detalle_orden_mantenimiento (
   indicaciones          text
 );
 
--- 2) Copia el detalle de las órdenes existentes (cabecera -> detalle)
---    La cabecera CONSERVA sus columnas (se usan en otros casos de uso);
---    el detalle es una tabla adicional, no un reemplazo.
-insert into detalle_orden_mantenimiento (orden_id, mecanico_id, tipo_mantenimiento_id, indicaciones)
-select id, mecanico_id, tipo_mantenimiento_id, indicaciones
-from orden_mantenimiento
-where not exists (
-  select 1 from detalle_orden_mantenimiento d where d.orden_id = orden_mantenimiento.id
-);
+-- 2) Copia el detalle desde la cabecera SOLO si esas columnas aún existen
+--    (para bases que todavía no se migraron). En bases ya migradas no hace nada.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'orden_mantenimiento' and column_name = 'mecanico_id'
+  ) then
+    insert into detalle_orden_mantenimiento (orden_id, mecanico_id, tipo_mantenimiento_id, indicaciones)
+    select o.id, o.mecanico_id, o.tipo_mantenimiento_id, o.indicaciones
+    from orden_mantenimiento o
+    where not exists (
+      select 1 from detalle_orden_mantenimiento d where d.orden_id = o.id
+    );
+  end if;
+end $$;

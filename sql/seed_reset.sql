@@ -32,17 +32,19 @@ from vehiculo where placa = 'YZA-135';
 -- 4) Una orden de mantenimiento registrada (Kia Rio · XYZ-789) — cabecera + detalle
 --    Requiere haber corrido antes sql/detalle_orden_mantenimiento.sql
 with cab as (
-  insert into orden_mantenimiento (vehiculo_id, jefe_id, mecanico_id, tipo_mantenimiento_id, estado, indicaciones)
+  insert into orden_mantenimiento (vehiculo_id, jefe_id, estado)
   values (
-    (select id from vehiculo          where placa = 'XYZ-789'),
-    (select id from usuario           where rol = 'JEFE_LOGISTICA' order by id limit 1),
-    (select id from usuario           where rol = 'MECANICO'       order by id limit 1),
-    (select id from tipo_mantenimiento where activo = true         order by id limit 1),
-    'PENDIENTE_INSPECCION',
-    'Revisión general y cambio de aceite'
+    (select id from vehiculo where placa = 'XYZ-789'),
+    (select id from usuario  where rol = 'JEFE_LOGISTICA' order by id limit 1),
+    'PENDIENTE_INSPECCION'
   )
-  returning id, mecanico_id, tipo_mantenimiento_id, indicaciones
+  returning id
 )
 insert into detalle_orden_mantenimiento (orden_id, mecanico_id, tipo_mantenimiento_id, indicaciones)
-select id, mecanico_id, tipo_mantenimiento_id, indicaciones from cab;
+select
+  cab.id,
+  (select id from usuario           where rol = 'MECANICO' order by id limit 1),
+  (select id from tipo_mantenimiento where activo = true    order by id limit 1),
+  'Revisión general y cambio de aceite'
+from cab;
 update vehiculo set estado = 'EN_MANTENIMIENTO' where placa = 'XYZ-789';
