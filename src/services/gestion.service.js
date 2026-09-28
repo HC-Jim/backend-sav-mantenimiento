@@ -70,10 +70,12 @@ class GestionService {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
     const precio = Number(datos.precio_normal || 0);
     const garantia = Number(datos.garantia || 0);
-    const costo = Number(datos.precio_costo || 0);
-    if (precio < 0 || garantia < 0 || costo < 0) {
-      throw AppError.badRequest('El precio, la garantia y el costo no pueden ser negativos');
+    if (precio < 0 || garantia < 0) {
+      throw AppError.badRequest('El precio y la garantia no pueden ser negativos');
     }
+    // El costo no se edita en este caso de uso: se fija en la compra.
+    // Se reutiliza el último costo registrado (inmutable aquí).
+    const costo = await precioRepo.ultimoCosto(id);
     const actualizado = await vehiculoRepo.actualizar(id, { precio_normal: precio, garantia });
     await precioRepo.registrar(id, { alquiler: precio, garantia, costo, registradoPor: usuario?.id || null });
     return actualizado;
@@ -88,6 +90,7 @@ class GestionService {
     const ultimo = ultimoReg ? Number(ultimoReg.alquiler) : 0;
     const ultimoCosto = ultimoReg ? Number(ultimoReg.costo) : 0;
     const margenActual = Math.round((ultimo - ultimoCosto) * 100) / 100;
+    const margenActualPct = ultimoCosto > 0 ? Math.round((margenActual / ultimoCosto) * 10000) / 100 : 0;
     const primero = precios.length ? precios[0] : 0;
     const promedio = precios.length
       ? Math.round((precios.reduce((a, b) => a + b, 0) / precios.length) * 100) / 100
@@ -95,7 +98,8 @@ class GestionService {
     const variacion = Math.round((ultimo - primero) * 100) / 100;
     const variacionPct = primero > 0 ? Math.round(((ultimo - primero) / primero) * 10000) / 100 : 0;
     return {
-      historial, ultimo, ultimo_costo: ultimoCosto, margen_actual: margenActual,
+      historial, ultimo, ultimo_costo: ultimoCosto,
+      margen_actual: margenActual, margen_actual_pct: margenActualPct,
       promedio, variacion, variacion_pct: variacionPct, cambios: historial.length
     };
   }

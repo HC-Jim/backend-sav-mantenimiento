@@ -44,6 +44,7 @@ class PrecioRepository {
       const garantia = Number(det.find((d) => d.concepto === 'GARANTIA')?.monto || 0);
       const costo = Number(det.find((d) => d.concepto === 'COSTO')?.monto || 0);
       const margen = Math.round((alquiler - costo) * 100) / 100;
+      const margenPct = costo > 0 ? Math.round((margen / costo) * 10000) / 100 : 0;
       return {
         id: r.id,
         fecha: r.fecha,
@@ -51,9 +52,16 @@ class PrecioRepository {
         garantia,
         costo,
         margen,
+        margen_pct: margenPct,
         registrado_por: r.registrado?.nombre || null
       };
     });
+  }
+
+  /** Último costo registrado del vehículo (0 si no hay). */
+  async ultimoCosto(vehiculoId) {
+    const h = await this.historial(vehiculoId);
+    return h.length ? Number(h[h.length - 1].costo) : 0;
   }
 }
 
