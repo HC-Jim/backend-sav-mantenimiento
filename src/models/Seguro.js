@@ -12,6 +12,10 @@ class Seguro {
     this.fechaVencimiento = row.fecha_vencimiento;
     this.sumaAsegurada = row.suma_asegurada;
     this.prima = row.prima;
+    this.deducible = row.deducible;
+    this.frecuenciaPago = row.frecuencia_pago;
+    this.moneda = row.moneda;
+    this.contactoAseguradora = row.contacto_aseguradora;
     this.cobertura = row.cobertura;
     this.observaciones = row.observaciones;
     this.archivoAdjunto = row.archivo_adjunto;
@@ -41,6 +45,10 @@ class Seguro {
       fecha_vencimiento: this.fechaVencimiento,
       suma_asegurada: this.sumaAsegurada,
       prima: this.prima,
+      deducible: this.deducible,
+      frecuencia_pago: this.frecuenciaPago,
+      moneda: this.moneda,
+      contacto_aseguradora: this.contactoAseguradora,
       cobertura: this.cobertura,
       observaciones: this.observaciones,
       archivo_adjunto: this.archivoAdjunto,

@@ -178,6 +178,10 @@ class GestionService {
       fecha_vencimiento: datos.fecha_vencimiento || null,
       suma_asegurada: datos.suma_asegurada != null ? Number(datos.suma_asegurada) : null,
       prima: datos.prima != null ? Number(datos.prima) : null,
+      deducible: datos.deducible != null ? Number(datos.deducible) : null,
+      frecuencia_pago: datos.frecuencia_pago || null,
+      moneda: datos.moneda || 'PEN',
+      contacto_aseguradora: datos.contacto_aseguradora || null,
       cobertura: datos.cobertura || null,
       observaciones: datos.observaciones || null,
       archivo_adjunto: datos.archivo_adjunto || null
