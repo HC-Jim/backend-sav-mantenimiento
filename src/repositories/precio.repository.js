@@ -7,8 +7,8 @@ const { unwrap } = require('../utils/db');
  *   - detalle_precio_vehiculo : detalle  (conceptos ALQUILER y GARANTIA).
  */
 class PrecioRepository {
-  /** Registra un precio: cabecera + detalle (alquiler y garantía). */
-  async registrar(vehiculoId, { alquiler, garantia, registradoPor = null }) {
+  /** Registra un precio: cabecera + detalle (alquiler, garantía y costo). */
+  async registrar(vehiculoId, { alquiler, garantia, costo = 0, registradoPor = null }) {
     const cabecera = unwrap(
       await supabase
         .from('precio_vehiculo')
@@ -19,10 +19,11 @@ class PrecioRepository {
     unwrap(
       await supabase.from('detalle_precio_vehiculo').insert([
         { precio_id: cabecera.id, concepto: 'ALQUILER', monto: alquiler },
-        { precio_id: cabecera.id, concepto: 'GARANTIA', monto: garantia }
+        { precio_id: cabecera.id, concepto: 'GARANTIA', monto: garantia },
+        { precio_id: cabecera.id, concepto: 'COSTO', monto: costo }
       ])
     );
-    return { ...cabecera, alquiler, garantia };
+    return { ...cabecera, alquiler, garantia, costo };
   }
 
   /** Historial de registros de precio (cabecera + su detalle), ascendente. */
@@ -36,16 +37,20 @@ class PrecioRepository {
         .eq('vehiculo_id', vehiculoId)
         .order('fecha', { ascending: true })
     );
-    // Aplana el detalle en {alquiler, garantia} por registro.
+    // Aplana el detalle en {alquiler, garantia, costo, margen} por registro.
     return rows.map((r) => {
       const det = Array.isArray(r.detalle) ? r.detalle : [];
       const alquiler = Number(det.find((d) => d.concepto === 'ALQUILER')?.monto || 0);
       const garantia = Number(det.find((d) => d.concepto === 'GARANTIA')?.monto || 0);
+      const costo = Number(det.find((d) => d.concepto === 'COSTO')?.monto || 0);
+      const margen = Math.round((alquiler - costo) * 100) / 100;
       return {
         id: r.id,
         fecha: r.fecha,
         alquiler,
         garantia,
+        costo,
+        margen,
         registrado_por: r.registrado?.nombre || null
       };
     });
