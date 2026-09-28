@@ -47,7 +47,11 @@ class MantenimientoService {
       jefe_id: usuario.id,
       mecanico_id: datos.mecanico_id || null,
       tipo_mantenimiento_id: tipo.id,
-      indicaciones: datos.indicaciones
+      indicaciones: datos.indicaciones,
+      prioridad: datos.prioridad,
+      km_ingreso: datos.km_ingreso,
+      fecha_programada: datos.fecha_programada,
+      costo_estimado: datos.costo_estimado
     });
     await vehiculoRepo.actualizarEstado(datos.vehiculo_id, 'EN_MANTENIMIENTO');
     return orden;

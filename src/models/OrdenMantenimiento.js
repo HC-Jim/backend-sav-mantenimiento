@@ -17,6 +17,10 @@ class OrdenMantenimiento {
     this.mecanicoId = det?.mecanico_id ?? null;
     this.tipoMantenimientoId = det?.tipo_mantenimiento_id ?? null;
     this.indicaciones = det?.indicaciones ?? null;
+    this.prioridad = det?.prioridad ?? null;
+    this.kmIngreso = det?.km_ingreso ?? null;
+    this.fechaProgramada = det?.fecha_programada ?? null;
+    this.costoEstimado = det?.costo_estimado ?? null;
 
     // Relaciones opcionales (cuando el repositorio las incluye en el select).
     this.vehiculo = row.vehiculo || null;
@@ -36,6 +40,10 @@ class OrdenMantenimiento {
       mecanico_id: this.mecanicoId,
       tipo_mantenimiento_id: this.tipoMantenimientoId,
       indicaciones: this.indicaciones,
+      prioridad: this.prioridad,
+      km_ingreso: this.kmIngreso,
+      fecha_programada: this.fechaProgramada,
+      costo_estimado: this.costoEstimado,
       estado: this.estado,
       fecha_creacion: this.fechaCreacion,
       vehiculo: this.vehiculo,

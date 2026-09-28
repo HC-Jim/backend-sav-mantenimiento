@@ -30,7 +30,11 @@ class OrdenRepository {
           orden_id: cabecera.id,
           mecanico_id: datos.mecanico_id || null,
           tipo_mantenimiento_id: datos.tipo_mantenimiento_id,
-          indicaciones: datos.indicaciones
+          indicaciones: datos.indicaciones,
+          prioridad: datos.prioridad || 'MEDIA',
+          km_ingreso: datos.km_ingreso ?? null,
+          fecha_programada: datos.fecha_programada || null,
+          costo_estimado: datos.costo_estimado ?? null
         })
         .select()
         .single()
@@ -44,7 +48,8 @@ class OrdenRepository {
       await supabase
         .from('orden_mantenimiento')
         .select('*, vehiculo:vehiculo_id (placa, marca, modelo), ' +
-          'detalle:detalle_orden_mantenimiento (indicaciones, ' +
+          'detalle:detalle_orden_mantenimiento (indicaciones, prioridad, km_ingreso, ' +
+          'fecha_programada, costo_estimado, ' +
           'tipo_mantenimiento:tipo_mantenimiento_id (nombre), ' +
           'mecanico:usuario!detalle_orden_mantenimiento_mecanico_id_fkey (nombre))')
         .order('fecha_creacion', { ascending: false })

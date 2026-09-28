@@ -32,3 +32,10 @@ begin
     );
   end if;
 end $$;
+
+-- 3) Campos adicionales del detalle (prioridad, km de ingreso, fecha
+--    programada y costo estimado del mantenimiento).
+alter table detalle_orden_mantenimiento add column if not exists prioridad       text default 'MEDIA';
+alter table detalle_orden_mantenimiento add column if not exists km_ingreso      int;
+alter table detalle_orden_mantenimiento add column if not exists fecha_programada date;
+alter table detalle_orden_mantenimiento add column if not exists costo_estimado  numeric;
