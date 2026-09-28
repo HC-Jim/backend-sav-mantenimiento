@@ -3,6 +3,7 @@ const clienteRepo = require('../repositories/cliente.repository');
 const seguroRepo = require('../repositories/seguro.repository');
 const usuarioRepo = require('../repositories/usuario.repository');
 const cuponRepo = require('../repositories/cupon.repository');
+const precioRepo = require('../repositories/precio.repository');
 const Usuario = require('../models/Usuario');
 const { Rol } = require('../domain/EstadoOrden');
 const AppError = require('../utils/AppError');
@@ -20,8 +21,8 @@ class GestionService {
   }
 
   /** Crear un vehiculo nuevo con sus datos y su precio/garantia iniciales.
-   *  El SKU se genera automaticamente (no editable). */
-  async crearVehiculo(datos) {
+   *  El SKU se genera automaticamente (no editable). Registra el primer precio. */
+  async crearVehiculo(datos, usuario = null) {
     if (!datos.placa) throw AppError.badRequest('La placa es obligatoria');
     const precio = Number(datos.precio_normal || 0);
     const garantia = Number(datos.garantia || 0);
@@ -41,7 +42,8 @@ class GestionService {
       garantia,
       estado: 'DISPONIBLE'
     });
-    await vehiculoRepo.registrarPrecio(vehiculo.id, precio, garantia);
+    // Registra el precio inicial (cabecera + detalle).
+    await precioRepo.registrar(vehiculo.id, { alquiler: precio, garantia, registradoPor: usuario?.id || null });
     return vehiculo;
   }
 
@@ -58,8 +60,12 @@ class GestionService {
     });
   }
 
-  /** Editar el precio de alquiler (fijo) y la garantia; deja traza en el historial. */
-  async actualizarPrecioVehiculo(id, datos) {
+  /**
+   * Registrar Precio Vehicular: fija el precio de alquiler y la garantia.
+   * Sincroniza el precio actual en el vehiculo (para reservas) y crea un
+   * registro de precio (cabecera + detalle) para el historial.
+   */
+  async actualizarPrecioVehiculo(id, datos, usuario = null) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
     const precio = Number(datos.precio_normal || 0);
     const garantia = Number(datos.garantia || 0);
@@ -67,15 +73,15 @@ class GestionService {
       throw AppError.badRequest('El precio y la garantia no pueden ser negativos');
     }
     const actualizado = await vehiculoRepo.actualizar(id, { precio_normal: precio, garantia });
-    await vehiculoRepo.registrarPrecio(id, precio, garantia);
+    await precioRepo.registrar(id, { alquiler: precio, garantia, registradoPor: usuario?.id || null });
     return actualizado;
   }
 
-  /** Historial de precios + estadisticas (ultimo, promedio, variacion). */
+  /** Historial de precios (cabecera/detalle) + estadisticas (ultimo, promedio, variacion). */
   async historialPrecios(id) {
     await this.#existe(vehiculoRepo, id, 'Vehiculo');
-    const historial = await vehiculoRepo.historialPrecios(id);
-    const precios = historial.map((h) => Number(h.precio_normal));
+    const historial = await precioRepo.historial(id);
+    const precios = historial.map((h) => Number(h.alquiler));
     const ultimo = precios.length ? precios[precios.length - 1] : 0;
     const primero = precios.length ? precios[0] : 0;
     const promedio = precios.length

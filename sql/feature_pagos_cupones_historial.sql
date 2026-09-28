@@ -37,17 +37,8 @@ alter table pago add column if not exists cupon_id         int references cupon(
 alter table pago add column if not exists descuento        numeric not null default 0;
 
 -- 3) HISTORIAL DE PRECIOS ------------------------------------
-create table if not exists historial_precio (
-  id            serial primary key,
-  vehiculo_id   int not null references vehiculo(id) on delete cascade,
-  precio_normal numeric not null default 0,
-  garantia      numeric not null default 0,
-  fecha         timestamptz not null default now()
-);
-
--- Backfill: registra el precio actual de cada vehículo como primer punto.
-insert into historial_precio (vehiculo_id, precio_normal, garantia)
-select id, precio_normal, garantia from vehiculo;
+-- (El historial de precios ahora se maneja con el patrón cabecera/detalle en
+--  sql/precio_vehiculo_cabecera_detalle.sql.)
 
 -- 4) SEGURO: campos adicionales ------------------------------
 alter table seguro add column if not exists suma_asegurada numeric;

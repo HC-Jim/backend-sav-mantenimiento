@@ -66,27 +66,6 @@ class VehiculoRepository {
     const n = (data[0]?.id || 0) + 1;
     return `VH-${String(n).padStart(4, '0')}`;
   }
-
-  // ---------- Historial de precios ----------
-  async registrarPrecio(vehiculoId, precioNormal, garantia) {
-    return unwrap(
-      await supabase.from('historial_precio').insert({
-        vehiculo_id: vehiculoId,
-        precio_normal: precioNormal,
-        garantia
-      }).select().single()
-    );
-  }
-
-  async historialPrecios(vehiculoId) {
-    return unwrap(
-      await supabase
-        .from('historial_precio')
-        .select('*')
-        .eq('vehiculo_id', vehiculoId)
-        .order('fecha', { ascending: true })
-    );
-  }
 }
 
 module.exports = new VehiculoRepository();

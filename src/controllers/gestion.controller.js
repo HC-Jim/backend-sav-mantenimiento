@@ -8,9 +8,9 @@ const asyncHandler = require('../utils/asyncHandler');
 class GestionController {
   // Vehiculos (CRUD unificado: datos + precios + historial)
   listarVehiculos = asyncHandler(async (_req, res) => res.json(await svc.listarVehiculos()));
-  crearVehiculo = asyncHandler(async (req, res) => res.status(201).json(await svc.crearVehiculo(req.body)));
+  crearVehiculo = asyncHandler(async (req, res) => res.status(201).json(await svc.crearVehiculo(req.body, req.user)));
   actualizarVehiculo = asyncHandler(async (req, res) => res.json(await svc.actualizarVehiculo(req.params.id, req.body)));
-  actualizarPrecioVehiculo = asyncHandler(async (req, res) => res.json(await svc.actualizarPrecioVehiculo(req.params.id, req.body)));
+  actualizarPrecioVehiculo = asyncHandler(async (req, res) => res.json(await svc.actualizarPrecioVehiculo(req.params.id, req.body, req.user)));
   historialPrecios = asyncHandler(async (req, res) => res.json(await svc.historialPrecios(req.params.id)));
 
   // Cupones
